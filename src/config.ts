@@ -19,6 +19,8 @@ export const config = {
     scopes: [
       'crm.objects.contacts.read',
       'crm.objects.contacts.write',
+      'crm.objects.deals.read',
+      'crm.objects.companies.read',
       'sales-email-read',
       'settings.users.read',
       'automation',

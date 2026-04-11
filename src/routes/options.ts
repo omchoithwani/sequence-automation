@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getSequences, getUsers, getUserEmails } from '../hubspot';
+import { getSequences, getUsers, getUserEmails, getAssociationLabels, AssociationLabel } from '../hubspot';
 
 const router = Router();
 
@@ -105,6 +105,56 @@ router.post('/sender-emails', async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('[options/sender-emails]', err?.response?.data ?? err.message);
     res.status(500).json({ options: [] });
+  }
+});
+
+// ── POST /options/association-labels ─────────────────────────────────────────
+
+/**
+ * POST /options/association-labels
+ * Returns all named association labels between deals/companies and contacts,
+ * plus fixed options for "all contacts" and "standard (no label)".
+ * Used as the optionsUrl for the associationLabel field in the enroll action.
+ */
+router.post('/association-labels', async (req: Request, res: Response) => {
+  const portalId = extractPortalId(req.body);
+  if (!portalId) { res.status(400).json({ options: [] }); return; }
+
+  try {
+    // Fetch labels for both object types in parallel; ignore whichever fails
+    const [dealResult, companyResult] = await Promise.allSettled([
+      getAssociationLabels(portalId, 'DEAL'),
+      getAssociationLabels(portalId, 'COMPANY'),
+    ]);
+
+    const seen = new Set<string>();
+    const namedOptions: { label: string; value: string; hidden: boolean }[] = [];
+
+    const addLabels = (labels: AssociationLabel[]) => {
+      for (const l of labels) {
+        if (l.label && !seen.has(l.label)) {
+          seen.add(l.label);
+          namedOptions.push({ label: l.label, value: l.label, hidden: false });
+        }
+      }
+    };
+
+    if (dealResult.status === 'fulfilled') addLabels(dealResult.value);
+    if (companyResult.status === 'fulfilled') addLabels(companyResult.value);
+
+    res.json({
+      options: [
+        { label: 'All associated contacts', value: '__all__', hidden: false },
+        { label: 'Standard (no label)', value: '__none__', hidden: false },
+        ...namedOptions,
+      ],
+    });
+  } catch (err: any) {
+    console.error('[options/association-labels]', err?.response?.data ?? err.message);
+    // Return a safe fallback so the workflow editor doesn't break
+    res.json({
+      options: [{ label: 'All associated contacts', value: '__all__', hidden: false }],
+    });
   }
 });
 

@@ -119,6 +119,80 @@ export async function getUserEmails(portalId: number, userId: string): Promise<s
   }
 }
 
+// ── Associations ─────────────────────────────────────────────────────────────
+
+const OBJECT_PATH: Record<string, string> = {
+  CONTACT: 'contacts',
+  DEAL: 'deals',
+  COMPANY: 'companies',
+};
+
+export interface AssociationLabel {
+  category: string;
+  typeId: number;
+  label: string | null;
+}
+
+/**
+ * Fetch all contact IDs associated with a deal or company.
+ *
+ * @param labelFilter
+ *   - undefined | "__all__"  → every associated contact
+ *   - "__none__"             → only contacts linked via the standard (unlabelled) association
+ *   - any other string       → only contacts where at least one association type has that label
+ */
+export async function getAssociatedContacts(
+  portalId: number,
+  fromObjectType: string,
+  objectId: string,
+  labelFilter?: string
+): Promise<string[]> {
+  const token = await getAccessToken(portalId);
+  const fromPath = OBJECT_PATH[fromObjectType] ?? fromObjectType.toLowerCase();
+  const contactIds: string[] = [];
+  let after: string | undefined;
+
+  do {
+    const res = await axios.get(
+      `${HUBAPI}/crm/v4/objects/${fromPath}/${objectId}/associations/contacts`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { limit: 500, ...(after ? { after } : {}) },
+      }
+    );
+
+    for (const result of (res.data.results ?? []) as any[]) {
+      const types: any[] = result.associationTypes ?? [];
+      const include =
+        !labelFilter || labelFilter === '__all__'
+          ? true
+          : labelFilter === '__none__'
+          ? types.some((t) => t.label === null)
+          : types.some((t) => t.label === labelFilter);
+
+      if (include) contactIds.push(String(result.toObjectId));
+    }
+
+    after = res.data.paging?.next?.after;
+  } while (after);
+
+  return contactIds;
+}
+
+/** Fetch all defined association labels between an object type and contacts. */
+export async function getAssociationLabels(
+  portalId: number,
+  fromObjectType: string
+): Promise<AssociationLabel[]> {
+  const token = await getAccessToken(portalId);
+  const fromPath = OBJECT_PATH[fromObjectType] ?? fromObjectType.toLowerCase();
+  const res = await axios.get(
+    `${HUBAPI}/crm/v4/associations/${fromPath}/contacts/labels`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return (res.data.results ?? []) as AssociationLabel[];
+}
+
 // ── Sequence enrollment ───────────────────────────────────────────────────────
 
 /**
