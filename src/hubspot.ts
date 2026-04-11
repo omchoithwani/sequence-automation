@@ -35,9 +35,10 @@ export async function getAccessToken(portalId: number): Promise<string> {
 
 // ── OAuth helpers ─────────────────────────────────────────────────────────────
 
-/** Exchange an authorization code for tokens and return the portal ID. */
+/** Exchange an authorization code for tokens and return the portal ID + hub domain. */
 export async function exchangeCode(code: string): Promise<{
   portalId: number;
+  hubDomain: string;
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
@@ -59,6 +60,7 @@ export async function exchangeCode(code: string): Promise<{
 
   return {
     portalId: infoRes.data.hub_id as number,
+    hubDomain: (infoRes.data.hub_domain ?? '') as string,
     accessToken: tokenRes.data.access_token as string,
     refreshToken: tokenRes.data.refresh_token as string,
     expiresIn: tokenRes.data.expires_in as number,
@@ -193,7 +195,7 @@ export async function getAssociationLabels(
   return (res.data.results ?? []) as AssociationLabel[];
 }
 
-// ── Sequence enrollment ───────────────────────────────────────────────────────
+// ── Sequence enrollment & unenrollment ───────────────────────────────────────
 
 /**
  * Enroll a contact into a sequence on behalf of a portal user.
@@ -225,4 +227,75 @@ export async function enrollInSequence(
       },
     }
   );
+}
+
+export interface SequenceEnrollment {
+  id: string;
+  sequenceId: string;
+  contactId: string;
+  status: string;
+}
+
+/**
+ * Get a contact's active sequence enrollments.
+ *
+ * GET /automation/v4/sequences/enrollments?contactId={id}
+ * Filters to ACTIVE status client-side; returns an empty array if the
+ * endpoint is unavailable (graceful fallback).
+ */
+export async function getActiveEnrollments(
+  portalId: number,
+  contactId: string
+): Promise<SequenceEnrollment[]> {
+  const token = await getAccessToken(portalId);
+  try {
+    const res = await axios.get(`${HUBAPI}/automation/v4/sequences/enrollments`, {
+      headers: { Authorization: `Bearer ${token}` },
+      params: { contactId },
+    });
+    const all: any[] = res.data.results ?? [];
+    return all
+      .filter((e) => e.status === 'ACTIVE' || e.state === 'ACTIVE')
+      .map((e) => ({
+        id: String(e.id),
+        sequenceId: String(e.sequenceId ?? e.sequence_id),
+        contactId: String(e.contactId ?? e.contact_id ?? contactId),
+        status: String(e.status ?? e.state),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Unenroll a contact from one specific sequence or from all active sequences.
+ *
+ * @param sequenceId  If provided (and not "__all__"), only that sequence is
+ *                    unenrolled. Otherwise all active enrollments are cancelled.
+ * @returns           Number of enrollments cancelled.
+ */
+export async function unenrollFromSequence(
+  portalId: number,
+  contactId: string,
+  sequenceId?: string
+): Promise<number> {
+  const token = await getAccessToken(portalId);
+  const enrollments = await getActiveEnrollments(portalId, contactId);
+
+  const targets =
+    !sequenceId || sequenceId === '__all__'
+      ? enrollments
+      : enrollments.filter((e) => e.sequenceId === sequenceId);
+
+  if (targets.length === 0) return 0;
+
+  await Promise.allSettled(
+    targets.map((e) =>
+      axios.delete(`${HUBAPI}/automation/v4/sequences/enrollments/${e.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    )
+  );
+
+  return targets.length;
 }

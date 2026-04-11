@@ -108,6 +108,31 @@ router.post('/sender-emails', async (req: Request, res: Response) => {
   }
 });
 
+// ── POST /options/sequences-all ──────────────────────────────────────────────
+
+/**
+ * POST /options/sequences-all
+ * Like /options/sequences but prepends an "All active sequences" option
+ * (value = "__all__") used by the unenroll action's optional sequenceId field.
+ */
+router.post('/sequences-all', async (req: Request, res: Response) => {
+  const portalId = extractPortalId(req.body);
+  if (!portalId) { res.status(400).json({ options: [] }); return; }
+
+  try {
+    const sequences = await getSequences(portalId);
+    res.json({
+      options: [
+        { label: 'All active sequences', value: '__all__', hidden: false },
+        ...sequences.map((s) => ({ label: s.name, value: s.id, hidden: false })),
+      ],
+    });
+  } catch (err: any) {
+    console.error('[options/sequences-all]', err?.response?.data ?? err.message);
+    res.status(500).json({ options: [] });
+  }
+});
+
 // ── POST /options/association-labels ─────────────────────────────────────────
 
 /**

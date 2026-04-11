@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { enrollInSequence, getAssociatedContacts } from '../hubspot';
+import { enrollInSequence, getAssociatedContacts, unenrollFromSequence } from '../hubspot';
+import { remainingEnrollments, addEnrollmentCount } from '../db';
 
 const router = Router();
 
@@ -13,123 +14,173 @@ function isAlreadyEnrolled(err: any): boolean {
   );
 }
 
-/**
- * Enroll a list of contacts, returning { enrolledCount, failedCount }.
- * Already-enrolled contacts are counted as successes (idempotent).
- * All enrollments run in parallel; individual failures are logged but do not
- * abort the rest.
- */
 async function bulkEnroll(
   portalId: number,
   contactIds: string[],
   sequenceId: string,
   senderId: string,
   senderEmail: string
-): Promise<{ enrolledCount: number; failedCount: number }> {
+): Promise<{ enrolled: number; failed: number }> {
   const results = await Promise.allSettled(
     contactIds.map((id) => enrollInSequence(portalId, id, sequenceId, senderId, senderEmail))
   );
-
-  let enrolledCount = 0;
-  let failedCount = 0;
-
-  for (const [i, result] of results.entries()) {
-    if (result.status === 'fulfilled' || (result.status === 'rejected' && isAlreadyEnrolled(result.reason))) {
-      enrolledCount++;
+  let enrolled = 0, failed = 0;
+  for (const [i, r] of results.entries()) {
+    if (r.status === 'fulfilled' || (r.status === 'rejected' && isAlreadyEnrolled(r.reason))) {
+      enrolled++;
     } else {
-      failedCount++;
-      console.error(
-        `[enroll-sequence] Failed for contact ${contactIds[i]}:`,
-        result.reason?.response?.data ?? result.reason?.message
-      );
+      failed++;
+      console.error(`[enroll] Contact ${contactIds[i]} failed:`, r.reason?.response?.data ?? r.reason?.message);
     }
   }
+  return { enrolled, failed };
+}
 
-  return { enrolledCount, failedCount };
+async function bulkUnenroll(
+  portalId: number,
+  contactIds: string[],
+  sequenceId?: string
+): Promise<{ unenrolled: number }> {
+  const results = await Promise.allSettled(
+    contactIds.map((id) => unenrollFromSequence(portalId, id, sequenceId))
+  );
+  const unenrolled = results.reduce((sum, r) => sum + (r.status === 'fulfilled' ? r.value : 0), 0);
+  return { unenrolled };
 }
 
 // ── Enroll in Sequence ────────────────────────────────────────────────────────
 
 /**
  * POST /webhook/enroll-sequence
- * Called by HubSpot when the "Enroll in Sequence" workflow action fires.
  *
- * Supports three object types:
- *   CONTACT  – enroll the contact directly
- *   DEAL     – traverse associations to find contacts, then enroll each
- *   COMPANY  – traverse associations to find contacts, then enroll each
+ * Input fields:  sequenceId, senderId, senderEmail, associationLabel (optional)
+ * Output fields: enrolledCount, failedCount, limitExceeded
  *
- * Input fields:
- *   sequenceId       – the sequence to enroll into
- *   senderId         – HubSpot user ID of the sender
- *   senderEmail      – sending email address
- *   associationLabel – (optional) label filter for deal/company workflows:
- *                        "__all__"  → all associated contacts (default)
- *                        "__none__" → only standard (no-label) associations
- *                        "<name>"   → only contacts with that label
- *
- * Output fields:
- *   enrolledCount – number of contacts enrolled (or already enrolled)
- *   failedCount   – number of contacts that failed enrollment
+ * Supports CONTACT, DEAL, and COMPANY objectTypes.
+ * Tracks monthly usage and enforces per-tier enrollment limits.
  */
 router.post('/enroll-sequence', async (req: Request, res: Response) => {
   const { origin, inputFields, object } = req.body ?? {};
-
   const portalId: number | undefined = origin?.portalId;
-  const objectId: string | undefined = String(object?.objectId ?? '');
-  const objectType: string | undefined = object?.objectType; // "CONTACT" | "DEAL" | "COMPANY"
-  const sequenceId: string | undefined = inputFields?.sequenceId;
-  const senderId: string | undefined = inputFields?.senderId;
-  const senderEmail: string | undefined = inputFields?.senderEmail;
-  const associationLabel: string | undefined = inputFields?.associationLabel;
+  const objectId = String(object?.objectId ?? '');
+  const objectType: string | undefined = object?.objectType;
+  const { sequenceId, senderId, senderEmail, associationLabel } = inputFields ?? {};
 
   if (!portalId || !objectId || !objectType || !sequenceId || !senderId || !senderEmail) {
-    console.error('[enroll-sequence] Missing fields:', { portalId, objectId, objectType, sequenceId, senderId, senderEmail });
-    res.status(400).json({ error: 'Missing required fields in webhook payload' });
+    res.status(400).json({ error: 'Missing required fields' });
+    return;
+  }
+
+  // ── Tier / limit check ────────────────────────────────────────────────────
+  const remaining = remainingEnrollments(portalId);
+  if (remaining === 0) {
+    console.log(`[enroll] Portal ${portalId} at enrollment limit`);
+    res.json({ outputFields: { enrolledCount: '0', failedCount: '0', limitExceeded: 'true' } });
     return;
   }
 
   try {
-    // ── Contact workflow: enroll directly ─────────────────────────────────────
+    // ── Contact workflow ──────────────────────────────────────────────────────
     if (objectType === 'CONTACT') {
       try {
         await enrollInSequence(portalId, objectId, sequenceId, senderId, senderEmail);
-        console.log(`[enroll-sequence] Enrolled contact ${objectId} in sequence ${sequenceId}`);
-        res.json({ outputFields: { enrolledCount: '1', failedCount: '0' } });
+        addEnrollmentCount(portalId, 1);
+        res.json({ outputFields: { enrolledCount: '1', failedCount: '0', limitExceeded: 'false' } });
       } catch (err: any) {
         if (isAlreadyEnrolled(err)) {
-          console.log(`[enroll-sequence] Contact ${objectId} already enrolled – skipping`);
-          res.json({ outputFields: { enrolledCount: '1', failedCount: '0' } });
+          res.json({ outputFields: { enrolledCount: '1', failedCount: '0', limitExceeded: 'false' } });
         } else {
-          console.error('[enroll-sequence] Enrollment failed:', err?.response?.data ?? err.message);
-          res.status(500).json({ error: 'Sequence enrollment failed' });
+          console.error('[enroll] Error:', err?.response?.data ?? err.message);
+          res.status(500).json({ error: 'Enrollment failed' });
         }
       }
       return;
     }
 
-    // ── Deal / Company workflow: traverse associations ────────────────────────
+    // ── Deal / Company workflow ───────────────────────────────────────────────
     if (objectType === 'DEAL' || objectType === 'COMPANY') {
       const contactIds = await getAssociatedContacts(portalId, objectType, objectId, associationLabel);
 
       if (contactIds.length === 0) {
-        const label = associationLabel && associationLabel !== '__all__' ? ` with label "${associationLabel}"` : '';
-        console.log(`[enroll-sequence] No contacts found on ${objectType} ${objectId}${label}`);
-        res.json({ outputFields: { enrolledCount: '0', failedCount: '0' } });
+        res.json({ outputFields: { enrolledCount: '0', failedCount: '0', limitExceeded: 'false' } });
         return;
       }
 
-      console.log(`[enroll-sequence] Enrolling ${contactIds.length} contact(s) from ${objectType} ${objectId}`);
-      const counts = await bulkEnroll(portalId, contactIds, sequenceId, senderId, senderEmail);
-      console.log(`[enroll-sequence] Done: ${counts.enrolledCount} enrolled, ${counts.failedCount} failed`);
-      res.json({ outputFields: { enrolledCount: String(counts.enrolledCount), failedCount: String(counts.failedCount) } });
+      // Respect the remaining limit — cap the batch
+      const toEnroll = remaining === Infinity ? contactIds : contactIds.slice(0, remaining);
+      const skipped = contactIds.length - toEnroll.length;
+
+      const counts = await bulkEnroll(portalId, toEnroll, sequenceId, senderId, senderEmail);
+      if (counts.enrolled > 0) addEnrollmentCount(portalId, counts.enrolled);
+
+      res.json({
+        outputFields: {
+          enrolledCount: String(counts.enrolled),
+          failedCount: String(counts.failed + skipped),
+          limitExceeded: skipped > 0 ? 'true' : 'false',
+        },
+      });
       return;
     }
 
     res.status(400).json({ error: `Unsupported objectType: ${objectType}` });
   } catch (err: any) {
-    console.error('[enroll-sequence] Unexpected error:', err?.response?.data ?? err.message);
-    res.status(500).json({ error: 'Internal error during enrollment' });
+    console.error('[enroll] Unexpected error:', err?.response?.data ?? err.message);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// ── Unenroll from Sequence ────────────────────────────────────────────────────
+
+/**
+ * POST /webhook/unenroll-sequence
+ *
+ * Input fields:
+ *   sequenceId       (optional) – which sequence to unenroll from.
+ *                                  Leave blank or "__all__" to cancel all active enrollments.
+ *   associationLabel (optional) – label filter for deal/company workflows.
+ *
+ * Output fields: unenrolledCount
+ *
+ * Supports CONTACT, DEAL, and COMPANY objectTypes.
+ */
+router.post('/unenroll-sequence', async (req: Request, res: Response) => {
+  const { origin, inputFields, object } = req.body ?? {};
+  const portalId: number | undefined = origin?.portalId;
+  const objectId = String(object?.objectId ?? '');
+  const objectType: string | undefined = object?.objectType;
+  const sequenceId: string | undefined = inputFields?.sequenceId;
+  const associationLabel: string | undefined = inputFields?.associationLabel;
+
+  if (!portalId || !objectId || !objectType) {
+    res.status(400).json({ error: 'Missing required fields' });
+    return;
+  }
+
+  try {
+    if (objectType === 'CONTACT') {
+      const count = await unenrollFromSequence(portalId, objectId, sequenceId);
+      console.log(`[unenroll] Contact ${objectId}: ${count} enrollment(s) cancelled`);
+      res.json({ outputFields: { unenrolledCount: String(count) } });
+      return;
+    }
+
+    if (objectType === 'DEAL' || objectType === 'COMPANY') {
+      const contactIds = await getAssociatedContacts(portalId, objectType, objectId, associationLabel);
+      if (contactIds.length === 0) {
+        res.json({ outputFields: { unenrolledCount: '0' } });
+        return;
+      }
+      const { unenrolled } = await bulkUnenroll(portalId, contactIds, sequenceId);
+      console.log(`[unenroll] ${objectType} ${objectId}: ${unenrolled} enrollment(s) cancelled across ${contactIds.length} contacts`);
+      res.json({ outputFields: { unenrolledCount: String(unenrolled) } });
+      return;
+    }
+
+    res.status(400).json({ error: `Unsupported objectType: ${objectType}` });
+  } catch (err: any) {
+    console.error('[unenroll] Error:', err?.response?.data ?? err.message);
+    res.status(500).json({ error: 'Internal error' });
   }
 });
 
@@ -137,32 +188,23 @@ router.post('/enroll-sequence', async (req: Request, res: Response) => {
 
 /**
  * POST /webhook/random-branch
- * Called by HubSpot when the "Random Branch" workflow action fires.
  *
- * Input fields:
- *   percentage – 0–100, probability of landing in Branch A
+ * Input fields:  percentage (0–100) — probability of Branch A
+ * Output fields: branch ("A" or "B")
  *
- * Output fields:
- *   branch – "A" or "B"
- *
- * After this action add an If/then branch:
+ * After this action, add an If/then branch:
  *   "Result (A or B)" equals "A"  →  Path A
- *   All other contacts             →  Path B  (or add a second branch for "B")
+ *   All others                     →  Path B
  */
 router.post('/random-branch', (req: Request, res: Response) => {
   const { origin, inputFields } = req.body ?? {};
-  const portalId: number | undefined = origin?.portalId;
-
-  if (!portalId) {
-    res.status(400).json({ error: 'Missing portalId' });
-    return;
-  }
+  if (!origin?.portalId) { res.status(400).json({ error: 'Missing portalId' }); return; }
 
   const raw = parseFloat(inputFields?.percentage ?? '50');
-  const percentage = isNaN(raw) ? 50 : Math.max(0, Math.min(100, raw));
-  const branch = Math.random() * 100 < percentage ? 'A' : 'B';
+  const pct = isNaN(raw) ? 50 : Math.max(0, Math.min(100, raw));
+  const branch = Math.random() * 100 < pct ? 'A' : 'B';
 
-  console.log(`[random-branch] portalId=${portalId} percentage=${percentage} → branch ${branch}`);
+  console.log(`[random-branch] portalId=${origin.portalId} pct=${pct} → ${branch}`);
   res.json({ outputFields: { branch } });
 });
 
