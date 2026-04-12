@@ -72,7 +72,7 @@ router.post('/enroll-sequence', async (req: Request, res: Response) => {
   }
 
   // ── Tier / limit check ────────────────────────────────────────────────────
-  const remaining = remainingEnrollments(portalId);
+  const remaining = await remainingEnrollments(portalId);
   if (remaining === 0) {
     console.log(`[enroll] Portal ${portalId} at enrollment limit`);
     res.json({ outputFields: { enrolledCount: '0', failedCount: '0', limitExceeded: 'true' } });
@@ -84,7 +84,7 @@ router.post('/enroll-sequence', async (req: Request, res: Response) => {
     if (objectType === 'CONTACT') {
       try {
         await enrollInSequence(portalId, objectId, sequenceId, senderId, senderEmail);
-        addEnrollmentCount(portalId, 1);
+        await addEnrollmentCount(portalId, 1);
         res.json({ outputFields: { enrolledCount: '1', failedCount: '0', limitExceeded: 'false' } });
       } catch (err: any) {
         if (isAlreadyEnrolled(err)) {
@@ -111,7 +111,7 @@ router.post('/enroll-sequence', async (req: Request, res: Response) => {
       const skipped = contactIds.length - toEnroll.length;
 
       const counts = await bulkEnroll(portalId, toEnroll, sequenceId, senderId, senderEmail);
-      if (counts.enrolled > 0) addEnrollmentCount(portalId, counts.enrolled);
+      if (counts.enrolled > 0) await addEnrollmentCount(portalId, counts.enrolled);
 
       res.json({
         outputFields: {

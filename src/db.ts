@@ -1,47 +1,64 @@
-import BetterSqlite3 from 'better-sqlite3';
+import { createClient, Client } from '@libsql/client';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 
-const DATA_DIR = join(process.cwd(), 'data');
-mkdirSync(DATA_DIR, { recursive: true });
+// ── Client factory ────────────────────────────────────────────────────────────
 
-const db = new BetterSqlite3(join(DATA_DIR, 'tokens.db'));
+let _db: Client | null = null;
 
-db.exec(`
-  -- OAuth tokens (one row per installed portal)
-  CREATE TABLE IF NOT EXISTS portal_tokens (
-    portal_id     INTEGER PRIMARY KEY,
-    access_token  TEXT NOT NULL,
-    refresh_token TEXT NOT NULL,
-    expires_at    INTEGER NOT NULL
+function getDb(): Client {
+  if (!_db) {
+    const tursoUrl = process.env.TURSO_DATABASE_URL;
+    if (tursoUrl) {
+      _db = createClient({
+        url: tursoUrl,
+        authToken: process.env.TURSO_AUTH_TOKEN,
+      });
+    } else {
+      const dataDir = join(process.cwd(), 'data');
+      mkdirSync(dataDir, { recursive: true });
+      _db = createClient({ url: `file:${join(dataDir, 'tokens.db')}` });
+    }
+  }
+  return _db;
+}
+
+// ── Schema bootstrap ──────────────────────────────────────────────────────────
+
+export async function initDb(): Promise<void> {
+  const db = getDb();
+  await db.batch(
+    [
+      `CREATE TABLE IF NOT EXISTS portal_tokens (
+        portal_id     INTEGER PRIMARY KEY,
+        access_token  TEXT NOT NULL,
+        refresh_token TEXT NOT NULL,
+        expires_at    INTEGER NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS portal_info (
+        portal_id    INTEGER PRIMARY KEY,
+        hub_domain   TEXT,
+        installed_at INTEGER NOT NULL DEFAULT (unixepoch())
+      )`,
+      `CREATE TABLE IF NOT EXISTS portal_subscriptions (
+        portal_id              INTEGER PRIMARY KEY,
+        tier                   TEXT NOT NULL DEFAULT 'FREE',
+        billing_cycle          TEXT,
+        paypal_subscription_id TEXT,
+        period_end_at          INTEGER,
+        status                 TEXT NOT NULL DEFAULT 'ACTIVE',
+        updated_at             INTEGER NOT NULL DEFAULT (unixepoch())
+      )`,
+      `CREATE TABLE IF NOT EXISTS enrollment_usage (
+        portal_id  INTEGER NOT NULL,
+        year_month TEXT NOT NULL,
+        count      INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (portal_id, year_month)
+      )`,
+    ],
+    'write'
   );
-
-  -- Basic portal metadata captured during OAuth install
-  CREATE TABLE IF NOT EXISTS portal_info (
-    portal_id    INTEGER PRIMARY KEY,
-    hub_domain   TEXT,
-    installed_at INTEGER NOT NULL DEFAULT (unixepoch())
-  );
-
-  -- Subscription / tier state per portal
-  CREATE TABLE IF NOT EXISTS portal_subscriptions (
-    portal_id              INTEGER PRIMARY KEY,
-    tier                   TEXT NOT NULL DEFAULT 'FREE',     -- FREE | PRO | ENTERPRISE
-    billing_cycle          TEXT,                              -- MONTHLY | YEARLY
-    paypal_subscription_id TEXT,
-    period_end_at          INTEGER,
-    status                 TEXT NOT NULL DEFAULT 'ACTIVE',   -- ACTIVE | CANCELLED | SUSPENDED
-    updated_at             INTEGER NOT NULL DEFAULT (unixepoch())
-  );
-
-  -- Monthly enrollment counts for metering / tier enforcement
-  CREATE TABLE IF NOT EXISTS enrollment_usage (
-    portal_id  INTEGER NOT NULL,
-    year_month TEXT NOT NULL,   -- e.g. "2024-01"
-    count      INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (portal_id, year_month)
-  );
-`);
+}
 
 // ── Tier limits ───────────────────────────────────────────────────────────────
 
@@ -53,29 +70,41 @@ export const TIER_LIMITS: Record<string, number> = {
 
 // ── OAuth token helpers ───────────────────────────────────────────────────────
 
-interface TokenRow { access_token: string; refresh_token: string; expires_at: number; }
-const stmtUpsertToken = db.prepare<[number, string, string, number]>(
-  'INSERT OR REPLACE INTO portal_tokens (portal_id, access_token, refresh_token, expires_at) VALUES (?,?,?,?)'
-);
-const stmtGetToken = db.prepare<[number], TokenRow>(
-  'SELECT access_token, refresh_token, expires_at FROM portal_tokens WHERE portal_id = ?'
-);
-
-export function saveToken(portalId: number, accessToken: string, refreshToken: string, expiresIn: number): void {
-  stmtUpsertToken.run(portalId, accessToken, refreshToken, Date.now() + expiresIn * 1000);
+export async function saveToken(
+  portalId: number,
+  accessToken: string,
+  refreshToken: string,
+  expiresIn: number
+): Promise<void> {
+  await getDb().execute({
+    sql: 'INSERT OR REPLACE INTO portal_tokens (portal_id, access_token, refresh_token, expires_at) VALUES (?,?,?,?)',
+    args: [portalId, accessToken, refreshToken, Date.now() + expiresIn * 1000],
+  });
 }
 
-export function getStoredToken(portalId: number): { accessToken: string; refreshToken: string; expiresAt: number } | null {
-  const r = stmtGetToken.get(portalId);
+export async function getStoredToken(
+  portalId: number
+): Promise<{ accessToken: string; refreshToken: string; expiresAt: number } | null> {
+  const result = await getDb().execute({
+    sql: 'SELECT access_token, refresh_token, expires_at FROM portal_tokens WHERE portal_id = ?',
+    args: [portalId],
+  });
+  const r = result.rows[0];
   if (!r) return null;
-  return { accessToken: r.access_token, refreshToken: r.refresh_token, expiresAt: r.expires_at };
+  return {
+    accessToken: r.access_token as string,
+    refreshToken: r.refresh_token as string,
+    expiresAt: r.expires_at as number,
+  };
 }
 
 // ── Portal info helpers ───────────────────────────────────────────────────────
 
-export function savePortalInfo(portalId: number, hubDomain: string): void {
-  db.prepare('INSERT OR IGNORE INTO portal_info (portal_id, hub_domain) VALUES (?,?)')
-    .run(portalId, hubDomain);
+export async function savePortalInfo(portalId: number, hubDomain: string): Promise<void> {
+  await getDb().execute({
+    sql: 'INSERT OR IGNORE INTO portal_info (portal_id, hub_domain) VALUES (?,?)',
+    args: [portalId, hubDomain],
+  });
 }
 
 // ── Subscription helpers ──────────────────────────────────────────────────────
@@ -90,48 +119,60 @@ export interface PortalSubscription {
   updatedAt: number;
 }
 
-interface SubRow {
-  portal_id: number; tier: string; billing_cycle: string | null;
-  paypal_subscription_id: string | null; period_end_at: number | null;
-  status: string; updated_at: number;
-}
-
-function rowToSub(r: SubRow): PortalSubscription {
+export async function getSubscription(portalId: number): Promise<PortalSubscription> {
+  const result = await getDb().execute({
+    sql: 'SELECT * FROM portal_subscriptions WHERE portal_id = ?',
+    args: [portalId],
+  });
+  const r = result.rows[0];
+  if (!r) {
+    return {
+      portalId,
+      tier: 'FREE',
+      billingCycle: null,
+      paypalSubscriptionId: null,
+      periodEndAt: null,
+      status: 'ACTIVE',
+      updatedAt: 0,
+    };
+  }
   return {
-    portalId: r.portal_id, tier: r.tier, billingCycle: r.billing_cycle,
-    paypalSubscriptionId: r.paypal_subscription_id, periodEndAt: r.period_end_at,
-    status: r.status, updatedAt: r.updated_at,
+    portalId: r.portal_id as number,
+    tier: r.tier as string,
+    billingCycle: r.billing_cycle as string | null,
+    paypalSubscriptionId: r.paypal_subscription_id as string | null,
+    periodEndAt: r.period_end_at as number | null,
+    status: r.status as string,
+    updatedAt: r.updated_at as number,
   };
 }
 
-export function getSubscription(portalId: number): PortalSubscription {
-  const r = db.prepare<[number], SubRow>(
-    'SELECT * FROM portal_subscriptions WHERE portal_id = ?'
-  ).get(portalId);
-  // Default to FREE / ACTIVE if no row exists
-  return r ? rowToSub(r) : {
-    portalId, tier: 'FREE', billingCycle: null, paypalSubscriptionId: null,
-    periodEndAt: null, status: 'ACTIVE', updatedAt: 0,
-  };
-}
-
-export function upsertSubscription(
+export async function upsertSubscription(
   portalId: number,
-  data: { tier?: string; billingCycle?: string | null; paypalSubscriptionId?: string | null; periodEndAt?: number | null; status?: string }
-): void {
-  const current = getSubscription(portalId);
-  db.prepare(`
-    INSERT OR REPLACE INTO portal_subscriptions
+  data: {
+    tier?: string;
+    billingCycle?: string | null;
+    paypalSubscriptionId?: string | null;
+    periodEndAt?: number | null;
+    status?: string;
+  }
+): Promise<void> {
+  const current = await getSubscription(portalId);
+  await getDb().execute({
+    sql: `INSERT OR REPLACE INTO portal_subscriptions
       (portal_id, tier, billing_cycle, paypal_subscription_id, period_end_at, status, updated_at)
-    VALUES (?,?,?,?,?,?,unixepoch())
-  `).run(
-    portalId,
-    data.tier ?? current.tier,
-    data.billingCycle !== undefined ? data.billingCycle : current.billingCycle,
-    data.paypalSubscriptionId !== undefined ? data.paypalSubscriptionId : current.paypalSubscriptionId,
-    data.periodEndAt !== undefined ? data.periodEndAt : current.periodEndAt,
-    data.status ?? current.status,
-  );
+      VALUES (?,?,?,?,?,?,unixepoch())`,
+    args: [
+      portalId,
+      data.tier ?? current.tier,
+      data.billingCycle !== undefined ? data.billingCycle : current.billingCycle,
+      data.paypalSubscriptionId !== undefined
+        ? data.paypalSubscriptionId
+        : current.paypalSubscriptionId,
+      data.periodEndAt !== undefined ? data.periodEndAt : current.periodEndAt,
+      data.status ?? current.status,
+    ],
+  });
 }
 
 // ── Enrollment usage helpers ──────────────────────────────────────────────────
@@ -141,32 +182,36 @@ function currentYearMonth(): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
-export function addEnrollmentCount(portalId: number, count: number): void {
+export async function addEnrollmentCount(portalId: number, count: number): Promise<void> {
   const ym = currentYearMonth();
-  db.prepare(`
-    INSERT INTO enrollment_usage (portal_id, year_month, count) VALUES (?,?,?)
-    ON CONFLICT(portal_id, year_month) DO UPDATE SET count = count + excluded.count
-  `).run(portalId, ym, count);
+  await getDb().execute({
+    sql: `INSERT INTO enrollment_usage (portal_id, year_month, count) VALUES (?,?,?)
+      ON CONFLICT(portal_id, year_month) DO UPDATE SET count = count + excluded.count`,
+    args: [portalId, ym, count],
+  });
 }
 
-export function getMonthlyCount(portalId: number): number {
+export async function getMonthlyCount(portalId: number): Promise<number> {
   const ym = currentYearMonth();
-  const r = db.prepare<[number, string], { count: number }>(
-    'SELECT count FROM enrollment_usage WHERE portal_id = ? AND year_month = ?'
-  ).get(portalId, ym);
-  return r?.count ?? 0;
+  const result = await getDb().execute({
+    sql: 'SELECT count FROM enrollment_usage WHERE portal_id = ? AND year_month = ?',
+    args: [portalId, ym],
+  });
+  const r = result.rows[0];
+  return r ? (r.count as number) : 0;
 }
 
 /**
  * Returns how many more enrollments this portal can make this month.
- * Returns Infinity for Enterprise.  Returns 0 if over limit.
+ * Returns Infinity for Enterprise. Returns 0 if over limit.
  */
-export function remainingEnrollments(portalId: number): number {
-  const sub = getSubscription(portalId);
+export async function remainingEnrollments(portalId: number): Promise<number> {
+  const sub = await getSubscription(portalId);
   const effectiveTier = sub.status === 'ACTIVE' ? sub.tier : 'FREE';
   const limit = TIER_LIMITS[effectiveTier] ?? TIER_LIMITS.FREE;
   if (limit === Infinity) return Infinity;
-  return Math.max(0, limit - getMonthlyCount(portalId));
+  const used = await getMonthlyCount(portalId);
+  return Math.max(0, limit - used);
 }
 
 // ── Admin overview ────────────────────────────────────────────────────────────
@@ -183,33 +228,37 @@ export interface AdminPortalRow {
   tierLimit: number | null; // null = unlimited
 }
 
-export function getAllPortals(): AdminPortalRow[] {
+export async function getAllPortals(): Promise<AdminPortalRow[]> {
   const ym = currentYearMonth();
-  const rows = db.prepare<[string], any>(`
-    SELECT
+  const result = await getDb().execute({
+    sql: `SELECT
       pi.portal_id,
       pi.hub_domain,
       pi.installed_at,
-      COALESCE(ps.tier, 'FREE')   AS tier,
+      COALESCE(ps.tier, 'FREE')     AS tier,
       ps.billing_cycle,
       ps.paypal_subscription_id,
       COALESCE(ps.status, 'ACTIVE') AS status,
-      COALESCE(eu.count, 0) AS monthly_count
+      COALESCE(eu.count, 0)         AS monthly_count
     FROM portal_info pi
     LEFT JOIN portal_subscriptions ps ON ps.portal_id = pi.portal_id
     LEFT JOIN enrollment_usage eu ON eu.portal_id = pi.portal_id AND eu.year_month = ?
-    ORDER BY pi.installed_at DESC
-  `).all(ym);
+    ORDER BY pi.installed_at DESC`,
+    args: [ym],
+  });
 
-  return rows.map((r) => ({
-    portalId: r.portal_id,
-    hubDomain: r.hub_domain,
-    installedAt: r.installed_at,
-    tier: r.tier,
-    billingCycle: r.billing_cycle,
-    paypalSubscriptionId: r.paypal_subscription_id,
-    status: r.status,
-    monthlyCount: r.monthly_count,
-    tierLimit: TIER_LIMITS[r.tier] === Infinity ? null : (TIER_LIMITS[r.tier] ?? TIER_LIMITS.FREE),
+  return result.rows.map((r) => ({
+    portalId: r.portal_id as number,
+    hubDomain: r.hub_domain as string | null,
+    installedAt: r.installed_at as number,
+    tier: r.tier as string,
+    billingCycle: r.billing_cycle as string | null,
+    paypalSubscriptionId: r.paypal_subscription_id as string | null,
+    status: r.status as string,
+    monthlyCount: r.monthly_count as number,
+    tierLimit:
+      TIER_LIMITS[r.tier as string] === Infinity
+        ? null
+        : (TIER_LIMITS[r.tier as string] ?? TIER_LIMITS.FREE),
   }));
 }

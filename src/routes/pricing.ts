@@ -38,13 +38,13 @@ const FEATURES: Record<string, string[]> = {
  * Pass ?portalId=X to pre-fill the subscribe buttons.
  * Pass ?installed=1 to show a "you just installed" banner.
  */
-router.get('/', (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   const portalId = String(req.query.portalId ?? '');
   const justInstalled = req.query.installed === '1';
   const { pro, enterprise } = config.pricing;
 
   const currentTier = portalId
-    ? getSubscription(parseInt(portalId, 10)).tier
+    ? (await getSubscription(parseInt(portalId, 10))).tier
     : null;
 
   const savePct = Math.round((1 - (pro.yearly / 12) / pro.monthly) * 100);
@@ -256,7 +256,7 @@ router.get('/return', async (req: Request, res: Response) => {
       return;
     }
 
-    upsertSubscription(portalId, {
+    await upsertSubscription(portalId, {
       tier: tierFromPlan(plan as Plan),
       billingCycle: cycle.toUpperCase(),
       paypalSubscriptionId: subscriptionId,
@@ -323,7 +323,7 @@ export async function handlePayPalWebhook(req: Request, res: Response): Promise<
 
   switch (eventType) {
     case 'BILLING.SUBSCRIPTION.ACTIVATED':
-      upsertSubscription(portalId, {
+      await upsertSubscription(portalId, {
         tier: tierFromPlan(plan as Plan),
         billingCycle: (cycle ?? 'MONTHLY').toUpperCase(),
         paypalSubscriptionId: subscriptionId,
@@ -333,15 +333,15 @@ export async function handlePayPalWebhook(req: Request, res: Response): Promise<
 
     case 'BILLING.SUBSCRIPTION.CANCELLED':
     case 'BILLING.SUBSCRIPTION.EXPIRED':
-      upsertSubscription(portalId, { tier: 'FREE', billingCycle: null, status: 'CANCELLED' });
+      await upsertSubscription(portalId, { tier: 'FREE', billingCycle: null, status: 'CANCELLED' });
       break;
 
     case 'BILLING.SUBSCRIPTION.SUSPENDED':
-      upsertSubscription(portalId, { status: 'SUSPENDED' });
+      await upsertSubscription(portalId, { status: 'SUSPENDED' });
       break;
 
     case 'BILLING.SUBSCRIPTION.RE_ACTIVATED':
-      upsertSubscription(portalId, {
+      await upsertSubscription(portalId, {
         tier: tierFromPlan(plan as Plan),
         status: 'ACTIVE',
       });

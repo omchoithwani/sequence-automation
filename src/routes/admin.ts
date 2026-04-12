@@ -30,9 +30,9 @@ function tierBadge(tier: string, status: string): string {
  * Main admin dashboard. Protected by adminAuth middleware.
  * Access: /admin?secret=YOUR_ADMIN_SECRET
  */
-router.get('/', (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   const secret = (req as any).adminSecret as string;
-  const portals = getAllPortals();
+  const portals = await getAllPortals();
 
   const totalPortals = portals.length;
   const paidPortals = portals.filter((p) => p.tier !== 'FREE' && p.status === 'ACTIVE').length;
@@ -170,7 +170,7 @@ router.get('/', (req: Request, res: Response) => {
  * Override a portal's tier manually. Useful for grandfathered accounts,
  * refunds, or manual deals.
  */
-router.post('/set-tier', (req: Request, res: Response) => {
+router.post('/set-tier', async (req: Request, res: Response) => {
   const portalId = parseInt(req.body.portalId ?? '', 10);
   const tier = String(req.body.tier ?? 'FREE').toUpperCase();
   const secret = (req as any).adminSecret as string;
@@ -180,7 +180,7 @@ router.post('/set-tier', (req: Request, res: Response) => {
     return;
   }
 
-  upsertSubscription(portalId, { tier, status: 'ACTIVE' });
+  await upsertSubscription(portalId, { tier, status: 'ACTIVE' });
   console.log(`[admin] Portal ${portalId} tier set to ${tier}`);
   res.redirect(`/admin?secret=${encodeURIComponent(secret)}`);
 });

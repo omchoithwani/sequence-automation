@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import { config } from './config';
+import { initDb } from './db';
 import authRoutes from './routes/auth';
 import webhookRoutes from './routes/webhook';
 import optionsRoutes from './routes/options';
@@ -107,10 +108,18 @@ app.get('/health', (_req: Request, res: Response) => res.json({ status: 'ok' }))
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 
-app.listen(config.port, () => {
-  console.log(`Server listening on port ${config.port}`);
-  console.log(`Landing page  → ${config.baseUrl}/`);
-  console.log(`Pricing       → ${config.baseUrl}/pricing`);
-  console.log(`Install URL   → ${config.baseUrl}/auth/install`);
-  console.log(`Admin panel   → ${config.baseUrl}/admin?secret=YOUR_ADMIN_SECRET`);
+async function bootstrap() {
+  await initDb();
+  app.listen(config.port, () => {
+    console.log(`Server listening on port ${config.port}`);
+    console.log(`Landing page  → ${config.baseUrl}/`);
+    console.log(`Pricing       → ${config.baseUrl}/pricing`);
+    console.log(`Install URL   → ${config.baseUrl}/auth/install`);
+    console.log(`Admin panel   → ${config.baseUrl}/admin?secret=YOUR_ADMIN_SECRET`);
+  });
+}
+
+bootstrap().catch((err) => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });

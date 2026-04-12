@@ -11,7 +11,7 @@ const HUBAPI = 'https://api.hubapi.com';
  * Throws if the portal has never installed the app.
  */
 export async function getAccessToken(portalId: number): Promise<string> {
-  const stored = getStoredToken(portalId);
+  const stored = await getStoredToken(portalId);
   if (!stored) throw new Error(`Portal ${portalId} has not installed the app`);
 
   // Refresh proactively when fewer than 5 minutes remain
@@ -26,7 +26,7 @@ export async function getAccessToken(portalId: number): Promise<string> {
       }),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
-    saveToken(portalId, res.data.access_token, res.data.refresh_token, res.data.expires_in);
+    await saveToken(portalId, res.data.access_token, res.data.refresh_token, res.data.expires_in);
     return res.data.access_token as string;
   }
 

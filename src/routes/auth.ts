@@ -42,8 +42,8 @@ router.get('/callback', async (req, res) => {
     const { portalId, hubDomain, accessToken, refreshToken, expiresIn } =
       await exchangeCode(code as string);
 
-    saveToken(portalId, accessToken, refreshToken, expiresIn);
-    savePortalInfo(portalId, hubDomain);
+    await saveToken(portalId, accessToken, refreshToken, expiresIn);
+    await savePortalInfo(portalId, hubDomain);
 
     console.log(`[auth] Portal ${portalId} (${hubDomain}) installed.`);
 

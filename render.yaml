@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: sequence-automation
+    env: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: node dist/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: BASE_URL
+        sync: false
+      - key: HUBSPOT_CLIENT_ID
+        sync: false
+      - key: HUBSPOT_CLIENT_SECRET
+        sync: false
+      - key: HUBSPOT_APP_ID
+        sync: false
+      - key: HUBSPOT_DEVELOPER_API_KEY
+        sync: false
+      - key: HUBSPOT_REDIRECT_URI
+        sync: false
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_ENV
+        value: sandbox
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: PAYPAL_PLAN_PRO_MONTHLY
+        sync: false
+      - key: PAYPAL_PLAN_PRO_YEARLY
+        sync: false
+      - key: PAYPAL_PLAN_ENTERPRISE_MONTHLY
+        sync: false
+      - key: PAYPAL_PLAN_ENTERPRISE_YEARLY
+        sync: false
+      - key: ADMIN_SECRET
+        sync: false
