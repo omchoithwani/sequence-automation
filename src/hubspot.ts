@@ -241,7 +241,7 @@ export async function enrollInSequence(
       contactId,
       sequenceId,
       userId: parseInt(userId, 10),
-      emailAddress,
+      senderEmail: emailAddress,
     },
     {
       headers: {
