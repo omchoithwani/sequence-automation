@@ -76,13 +76,16 @@ export interface HubSpotSequence {
 
 export async function getSequences(portalId: number): Promise<HubSpotSequence[]> {
   const token = await getAccessToken(portalId);
-  const res = await axios.get(`${HUBAPI}/crm/v3/objects/sequences`, {
+  const res = await axios.get(`${HUBAPI}/automation/v4/sequences`, {
     headers: { Authorization: `Bearer ${token}` },
-    params: { properties: 'hs_name,hs_active', limit: 100 },
+    params: { limit: 100 },
   });
   return (res.data.results as any[])
-    .filter((s) => s.properties?.hs_active !== 'false')
-    .map((s) => ({ id: s.id as string, name: (s.properties?.hs_name ?? `Sequence ${s.id}`) as string }));
+    .filter((s) => s.status !== 'INACTIVE' && s.status !== 'DELETED')
+    .map((s) => ({
+      id: String(s.id),
+      name: (s.name ?? s.label ?? `Sequence ${s.id}`) as string,
+    }));
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────
