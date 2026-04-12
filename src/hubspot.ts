@@ -240,7 +240,6 @@ export async function enrollInSequence(
     {
       contactId,
       sequenceId,
-      userId: parseInt(userId, 10),
       senderEmail: emailAddress,
     },
     {
@@ -248,6 +247,7 @@ export async function enrollInSequence(
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
+      params: { userId: parseInt(userId, 10) },
     }
   );
 }
