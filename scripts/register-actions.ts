@@ -34,8 +34,8 @@ const enrollAction = {
     {
       typeDefinition: {
         name: 'sequenceId',
-        type: 'STRING',
-        fieldType: 'SELECT',
+        type: 'enumeration',
+        fieldType: 'select',
         optionsUrl: `${BASE_URL}/options/sequences`,
       },
       isRequired: true,
@@ -44,8 +44,8 @@ const enrollAction = {
     {
       typeDefinition: {
         name: 'senderId',
-        type: 'STRING',
-        fieldType: 'SELECT',
+        type: 'enumeration',
+        fieldType: 'select',
         optionsUrl: `${BASE_URL}/options/users`,
       },
       isRequired: true,
@@ -54,8 +54,8 @@ const enrollAction = {
     {
       typeDefinition: {
         name: 'senderEmail',
-        type: 'STRING',
-        fieldType: 'SELECT',
+        type: 'enumeration',
+        fieldType: 'select',
         optionsUrl: `${BASE_URL}/options/sender-emails`,
       },
       isRequired: true,
@@ -64,8 +64,8 @@ const enrollAction = {
     {
       typeDefinition: {
         name: 'associationLabel',
-        type: 'STRING',
-        fieldType: 'SELECT',
+        type: 'enumeration',
+        fieldType: 'select',
         optionsUrl: `${BASE_URL}/options/association-labels`,
       },
       isRequired: false,
@@ -73,9 +73,9 @@ const enrollAction = {
     },
   ],
   outputFields: [
-    { typeDefinition: { name: 'enrolledCount', type: 'STRING', fieldType: 'TEXT' }, automationFieldType: 'NONE' },
-    { typeDefinition: { name: 'failedCount',   type: 'STRING', fieldType: 'TEXT' }, automationFieldType: 'NONE' },
-    { typeDefinition: { name: 'limitExceeded', type: 'STRING', fieldType: 'TEXT' }, automationFieldType: 'NONE' },
+    { typeDefinition: { name: 'enrolledCount', type: 'string', fieldType: 'text' }, automationFieldType: 'NONE' },
+    { typeDefinition: { name: 'failedCount',   type: 'string', fieldType: 'text' }, automationFieldType: 'NONE' },
+    { typeDefinition: { name: 'limitExceeded', type: 'string', fieldType: 'text' }, automationFieldType: 'NONE' },
   ],
   labels: {
     en: {
@@ -107,8 +107,8 @@ const unenrollAction = {
     {
       typeDefinition: {
         name: 'sequenceId',
-        type: 'STRING',
-        fieldType: 'SELECT',
+        type: 'enumeration',
+        fieldType: 'select',
         // Includes "All active sequences" (__all__) as first option
         optionsUrl: `${BASE_URL}/options/sequences-all`,
       },
@@ -118,8 +118,8 @@ const unenrollAction = {
     {
       typeDefinition: {
         name: 'associationLabel',
-        type: 'STRING',
-        fieldType: 'SELECT',
+        type: 'enumeration',
+        fieldType: 'select',
         optionsUrl: `${BASE_URL}/options/association-labels`,
       },
       isRequired: false,
@@ -127,7 +127,7 @@ const unenrollAction = {
     },
   ],
   outputFields: [
-    { typeDefinition: { name: 'unenrolledCount', type: 'STRING', fieldType: 'TEXT' }, automationFieldType: 'NONE' },
+    { typeDefinition: { name: 'unenrolledCount', type: 'string', fieldType: 'text' }, automationFieldType: 'NONE' },
   ],
   labels: {
     en: {
@@ -153,13 +153,13 @@ const branchAction = {
   objectTypes: ['CONTACT', 'DEAL', 'COMPANY'],
   inputFields: [
     {
-      typeDefinition: { name: 'percentage', type: 'NUMBER', fieldType: 'NUMBER' },
+      typeDefinition: { name: 'percentage', type: 'number', fieldType: 'number' },
       isRequired: true,
       automationFieldType: 'NONE',
     },
   ],
   outputFields: [
-    { typeDefinition: { name: 'branch', type: 'STRING', fieldType: 'TEXT' }, automationFieldType: 'NONE' },
+    { typeDefinition: { name: 'branch', type: 'string', fieldType: 'text' }, automationFieldType: 'NONE' },
   ],
   labels: {
     en: {
