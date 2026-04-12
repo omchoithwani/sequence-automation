@@ -200,11 +200,32 @@ router.post('/random-branch', (req: Request, res: Response) => {
   const { origin, inputFields } = req.body ?? {};
   if (!origin?.portalId) { res.status(400).json({ error: 'Missing portalId' }); return; }
 
-  const raw = parseFloat(inputFields?.percentage ?? '50');
-  const pct = isNaN(raw) ? 50 : Math.max(0, Math.min(100, raw));
-  const branch = Math.random() * 100 < pct ? 'A' : 'B';
+  // Collect weights for up to 5 branches; treat missing/invalid as 0
+  const weights = ['branch1', 'branch2', 'branch3', 'branch4', 'branch5'].map((key) => {
+    const w = parseFloat(inputFields?.[key] ?? '0');
+    return isNaN(w) ? 0 : Math.max(0, w);
+  });
 
-  console.log(`[random-branch] portalId=${origin.portalId} pct=${pct} → ${branch}`);
+  const total = weights.reduce((sum, w) => sum + w, 0);
+
+  // Default to branch 1 if nothing is configured
+  if (total === 0) {
+    res.json({ outputFields: { branch: '1' } });
+    return;
+  }
+
+  // Pick a branch proportionally to its weight
+  let rand = Math.random() * total;
+  let branch = '1';
+  for (let i = 0; i < weights.length; i++) {
+    rand -= weights[i];
+    if (rand <= 0) {
+      branch = String(i + 1);
+      break;
+    }
+  }
+
+  console.log(`[random-branch] portalId=${origin.portalId} weights=[${weights.join(',')}] → branch ${branch}`);
   res.json({ outputFields: { branch } });
 });
 

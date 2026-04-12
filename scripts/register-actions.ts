@@ -159,9 +159,33 @@ const branchAction = {
   objectTypes: ['CONTACT', 'DEAL', 'COMPANY'],
   inputFields: [
     {
-      typeDefinition: { name: 'percentage', type: 'number', fieldType: 'number' },
+      typeDefinition: { name: 'branch1', type: 'number', fieldType: 'number' },
       supportedValueTypes: ['STATIC_VALUE'],
       isRequired: true,
+      automationFieldType: 'NONE',
+    },
+    {
+      typeDefinition: { name: 'branch2', type: 'number', fieldType: 'number' },
+      supportedValueTypes: ['STATIC_VALUE'],
+      isRequired: true,
+      automationFieldType: 'NONE',
+    },
+    {
+      typeDefinition: { name: 'branch3', type: 'number', fieldType: 'number' },
+      supportedValueTypes: ['STATIC_VALUE'],
+      isRequired: false,
+      automationFieldType: 'NONE',
+    },
+    {
+      typeDefinition: { name: 'branch4', type: 'number', fieldType: 'number' },
+      supportedValueTypes: ['STATIC_VALUE'],
+      isRequired: false,
+      automationFieldType: 'NONE',
+    },
+    {
+      typeDefinition: { name: 'branch5', type: 'number', fieldType: 'number' },
+      supportedValueTypes: ['STATIC_VALUE'],
+      isRequired: false,
       automationFieldType: 'NONE',
     },
   ],
@@ -171,10 +195,20 @@ const branchAction = {
   labels: {
     en: {
       actionName: 'Random Branch',
-      actionDescription: 'Routes contacts randomly to Branch A or Branch B based on a percentage split.',
-      inputFieldLabels: { percentage: 'Percentage for Branch A (0–100)' },
-      outputFieldLabels: { branch: 'Result (A or B)' },
-      actionCardContent: '{{percentage}}% chance → Branch A',
+      actionDescription:
+        'Randomly routes contacts to one of up to 5 branches based on weights you define. ' +
+        'Enter a weight for each branch you want — they do not need to add up to 100. ' +
+        'The output field "Selected branch" will be "1", "2", "3", etc. ' +
+        'Use an If/then branch step after this action to split your workflow.',
+      inputFieldLabels: {
+        branch1: 'Branch 1 weight',
+        branch2: 'Branch 2 weight',
+        branch3: 'Branch 3 weight (0 to disable)',
+        branch4: 'Branch 4 weight (0 to disable)',
+        branch5: 'Branch 5 weight (0 to disable)',
+      },
+      outputFieldLabels: { branch: 'Selected branch (1–5)' },
+      actionCardContent: 'Random branch → {{branch1}} / {{branch2}} / {{branch3}}',
     },
   },
 };
