@@ -29,8 +29,8 @@ export const config = {
       'sales-email-read',
       'settings.users.read',
       'automation',
-      'sequences.read',
-      'sequences.write',
+      'automation.sequences.read',
+      'automation.sequences.enrollments.write',
     ],
   },
 
