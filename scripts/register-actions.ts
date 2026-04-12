@@ -161,13 +161,13 @@ const branchAction = {
     {
       typeDefinition: { name: 'branch1', type: 'number', fieldType: 'number' },
       supportedValueTypes: ['STATIC_VALUE'],
-      isRequired: true,
+      isRequired: false,
       automationFieldType: 'NONE',
     },
     {
       typeDefinition: { name: 'branch2', type: 'number', fieldType: 'number' },
       supportedValueTypes: ['STATIC_VALUE'],
-      isRequired: true,
+      isRequired: false,
       automationFieldType: 'NONE',
     },
     {
