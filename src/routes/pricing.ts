@@ -142,7 +142,9 @@ router.get('/', async (req: Request, res: Response) => {
 <nav>
   <a href="/">HubSpot Sequence Automation</a>
   <div class="links">
-    <a href="/auth/install">Install</a>
+    ${portalId
+      ? `<a href="https://app.hubspot.com">Back to HubSpot</a>`
+      : `<a href="/auth/install">Install</a>`}
   </div>
 </nav>
 ${justInstalled ? `<div class="banner">App installed successfully on portal <strong>${portalId}</strong>. Choose a plan below to get started, or continue on the Free tier.</div>` : ''}
