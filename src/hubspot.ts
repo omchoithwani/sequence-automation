@@ -261,33 +261,44 @@ export interface SequenceEnrollment {
 
 /**
  * Get a contact's active sequence enrollments.
- *
- * GET /automation/v4/sequences/enrollments?contactId={id}
- * Filters to ACTIVE status client-side; returns an empty array if the
- * endpoint is unavailable (graceful fallback).
+ * The API requires userId, so we query across all portal users and deduplicate.
+ * Terminal statuses (COMPLETED, FAILED, UNENROLLED, CANCELLED) are excluded.
  */
 export async function getActiveEnrollments(
   portalId: number,
   contactId: string
 ): Promise<SequenceEnrollment[]> {
   const token = await getAccessToken(portalId);
-  try {
-    const res = await axios.get(`${HUBAPI}/automation/v4/sequences/enrollments`, {
-      headers: { Authorization: `Bearer ${token}` },
-      params: { contactId },
-    });
-    const all: any[] = res.data.results ?? [];
-    return all
-      .filter((e) => e.status === 'ACTIVE' || e.state === 'ACTIVE')
-      .map((e) => ({
-        id: String(e.id),
-        sequenceId: String(e.sequenceId ?? e.sequence_id),
-        contactId: String(e.contactId ?? e.contact_id ?? contactId),
-        status: String(e.status ?? e.state),
-      }));
-  } catch {
-    return [];
-  }
+  const users = await getUsers(portalId);
+
+  const TERMINAL = new Set(['COMPLETED', 'FAILED', 'UNENROLLED', 'CANCELLED', 'ERROR']);
+  const seen = new Set<string>();
+  const enrollments: SequenceEnrollment[] = [];
+
+  await Promise.allSettled(
+    users.map(async (u) => {
+      const res = await axios.get(`${HUBAPI}/automation/v4/sequences/enrollments`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { contactId, userId: u.id },
+      });
+      for (const e of (res.data.results ?? []) as any[]) {
+        const status = String(e.status ?? e.state ?? '');
+        if (TERMINAL.has(status)) continue;
+        const id = String(e.id);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        enrollments.push({
+          id,
+          sequenceId: String(e.sequenceId ?? e.sequence_id ?? ''),
+          contactId: String(e.contactId ?? e.contact_id ?? contactId),
+          status,
+        });
+      }
+    })
+  );
+
+  console.log(`[enrollments] Contact ${contactId}: found ${enrollments.length} active enrollment(s)`);
+  return enrollments;
 }
 
 /**
