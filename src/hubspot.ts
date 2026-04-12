@@ -76,16 +76,36 @@ export interface HubSpotSequence {
 
 export async function getSequences(portalId: number): Promise<HubSpotSequence[]> {
   const token = await getAccessToken(portalId);
-  const res = await axios.get(`${HUBAPI}/automation/v4/sequences`, {
-    headers: { Authorization: `Bearer ${token}` },
-    params: { limit: 100 },
-  });
-  return (res.data.results as any[])
-    .filter((s) => s.status !== 'INACTIVE' && s.status !== 'DELETED')
-    .map((s) => ({
-      id: String(s.id),
-      name: (s.name ?? s.label ?? `Sequence ${s.id}`) as string,
-    }));
+
+  // The sequences API requires a userId — fetch all portal users then
+  // retrieve sequences for each in parallel, deduplicating by id.
+  const users = await getUsers(portalId);
+  if (users.length === 0) return [];
+
+  const perUser = await Promise.allSettled(
+    users.map((u) =>
+      axios.get(`${HUBAPI}/automation/v4/sequences`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { userId: u.id, limit: 100 },
+      })
+    )
+  );
+
+  const seen = new Set<string>();
+  const sequences: HubSpotSequence[] = [];
+
+  for (const result of perUser) {
+    if (result.status !== 'fulfilled') continue;
+    for (const s of (result.value.data.results ?? []) as any[]) {
+      if (s.status === 'INACTIVE' || s.status === 'DELETED') continue;
+      const id = String(s.id);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      sequences.push({ id, name: (s.name ?? s.label ?? `Sequence ${id}`) as string });
+    }
+  }
+
+  return sequences;
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────
