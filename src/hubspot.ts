@@ -322,3 +322,51 @@ export async function unenrollFromSequence(
 
   return targets.length;
 }
+
+// ── Sequence performance stats ────────────────────────────────────────────────
+
+export interface SequenceStatEntry {
+  id: string;
+  name: string;
+  openRate: number | null;
+  clickRate: number | null;
+  replyRate: number | null;
+  meetingRate: number | null;
+}
+
+/**
+ * Fetch sequence-level performance stats for all sequences in the portal.
+ * Stats fields are best-effort — returned as null if the API doesn't expose them.
+ */
+export async function getSequenceStatsMap(
+  portalId: number
+): Promise<Map<string, SequenceStatEntry>> {
+  const token = await getAccessToken(portalId);
+  const users = await getUsers(portalId);
+  const map = new Map<string, SequenceStatEntry>();
+
+  await Promise.allSettled(
+    users.map(async (u) => {
+      const res = await axios.get(`${HUBAPI}/automation/v4/sequences`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { userId: u.id, limit: 100 },
+      });
+      for (const s of (res.data.results ?? []) as any[]) {
+        const id = String(s.id);
+        if (map.has(id)) continue;
+        // HubSpot may return stats as top-level fields or nested under metrics
+        const m = s.metrics ?? s;
+        map.set(id, {
+          id,
+          name: s.name ?? `Sequence ${id}`,
+          openRate:    m.openRate    ?? m.open_rate    ?? null,
+          clickRate:   m.clickRate   ?? m.click_rate   ?? null,
+          replyRate:   m.replyRate   ?? m.reply_rate   ?? null,
+          meetingRate: m.meetingRate ?? m.meeting_rate ?? null,
+        });
+      }
+    })
+  );
+
+  return map;
+}

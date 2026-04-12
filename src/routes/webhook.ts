@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { enrollInSequence, getAssociatedContacts, unenrollFromSequence } from '../hubspot';
-import { remainingEnrollments, addEnrollmentCount } from '../db';
+import { remainingEnrollments, addEnrollmentCount, addSequenceCount } from '../db';
 
 const router = Router();
 
@@ -84,7 +84,10 @@ router.post('/enroll-sequence', async (req: Request, res: Response) => {
     if (objectType === 'CONTACT') {
       try {
         await enrollInSequence(portalId, objectId, sequenceId, senderId, senderEmail);
-        await addEnrollmentCount(portalId, 1);
+        await Promise.all([
+          addEnrollmentCount(portalId, 1),
+          addSequenceCount(portalId, sequenceId, 1),
+        ]);
         res.json({ outputFields: { enrolledCount: '1', failedCount: '0', limitExceeded: 'false' } });
       } catch (err: any) {
         if (isAlreadyEnrolled(err)) {
@@ -111,7 +114,12 @@ router.post('/enroll-sequence', async (req: Request, res: Response) => {
       const skipped = contactIds.length - toEnroll.length;
 
       const counts = await bulkEnroll(portalId, toEnroll, sequenceId, senderId, senderEmail);
-      if (counts.enrolled > 0) await addEnrollmentCount(portalId, counts.enrolled);
+      if (counts.enrolled > 0) {
+        await Promise.all([
+          addEnrollmentCount(portalId, counts.enrolled),
+          addSequenceCount(portalId, sequenceId, counts.enrolled),
+        ]);
+      }
 
       res.json({
         outputFields: {

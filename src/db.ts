@@ -55,6 +55,13 @@ export async function initDb(): Promise<void> {
         count      INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (portal_id, year_month)
       )`,
+      `CREATE TABLE IF NOT EXISTS sequence_usage (
+        portal_id   INTEGER NOT NULL,
+        sequence_id TEXT NOT NULL,
+        year_month  TEXT NOT NULL,
+        count       INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (portal_id, sequence_id, year_month)
+      )`,
     ],
     'write'
   );
@@ -260,5 +267,46 @@ export async function getAllPortals(): Promise<AdminPortalRow[]> {
       TIER_LIMITS[r.tier as string] === Infinity
         ? null
         : (TIER_LIMITS[r.tier as string] ?? TIER_LIMITS.FREE),
+  }));
+}
+
+// ── Per-sequence usage ────────────────────────────────────────────────────────
+
+export async function addSequenceCount(
+  portalId: number,
+  sequenceId: string,
+  count: number
+): Promise<void> {
+  const ym = currentYearMonth();
+  await getDb().execute({
+    sql: `INSERT INTO sequence_usage (portal_id, sequence_id, year_month, count) VALUES (?,?,?,?)
+      ON CONFLICT(portal_id, sequence_id, year_month) DO UPDATE SET count = count + excluded.count`,
+    args: [portalId, sequenceId, ym, count],
+  });
+}
+
+export interface SequenceUsageRow {
+  sequenceId: string;
+  thisMonth: number;
+  allTime: number;
+}
+
+export async function getSequenceCounts(portalId: number): Promise<SequenceUsageRow[]> {
+  const ym = currentYearMonth();
+  const result = await getDb().execute({
+    sql: `SELECT
+        sequence_id,
+        SUM(count) AS all_time,
+        SUM(CASE WHEN year_month = ? THEN count ELSE 0 END) AS this_month
+      FROM sequence_usage
+      WHERE portal_id = ?
+      GROUP BY sequence_id
+      ORDER BY all_time DESC`,
+    args: [ym, portalId],
+  });
+  return result.rows.map((r) => ({
+    sequenceId: r.sequence_id as string,
+    thisMonth: r.this_month as number,
+    allTime: r.all_time as number,
   }));
 }

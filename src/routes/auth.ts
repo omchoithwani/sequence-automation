@@ -92,6 +92,7 @@ router.get('/success', (req, res) => {
     <p>Portal <strong>${portalId}</strong> is connected. You can now use the Enroll in Sequence, Unenroll from Sequence, and Random Branch actions in any HubSpot workflow.</p>
     <div class="actions">
       <a href="https://app.hubspot.com" class="btn-primary">Go to HubSpot</a>
+      <a href="/dashboard?portalId=${portalId}" class="btn-outline">View my dashboard</a>
       <a href="/pricing?portalId=${portalId}" class="btn-outline">View pricing &amp; upgrade</a>
     </div>
   </div>

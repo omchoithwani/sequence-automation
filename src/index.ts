@@ -6,6 +6,7 @@ import webhookRoutes from './routes/webhook';
 import optionsRoutes from './routes/options';
 import pricingRoutes, { handlePayPalWebhook } from './routes/pricing';
 import adminRoutes from './routes/admin';
+import dashboardRoutes from './routes/dashboard';
 import { validateHubSpotSignature } from './middleware/signature';
 
 const app = express();
@@ -99,6 +100,9 @@ app.use('/pricing', pricingRoutes);
 
 // PayPal webhook (raw body needed for sig verification — already captured above)
 app.post('/paypal/webhook', handlePayPalWebhook);
+
+// Per-portal sequence performance dashboard
+app.use('/dashboard', dashboardRoutes);
 
 // Admin dashboard (protected by ADMIN_SECRET)
 app.use('/admin', adminRoutes);
