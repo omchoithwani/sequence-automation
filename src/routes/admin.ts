@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getAllPortals, upsertSubscription, TIER_LIMITS } from '../db';
 import { adminAuth } from '../middleware/admin-auth';
+import { TAILWIND_SETUP, FOOTER } from '../ui';
 
 const router = Router();
 router.use(adminAuth);
@@ -14,22 +15,18 @@ function fmtDate(unixSec: number): string {
 }
 
 function tierBadge(tier: string, status: string): string {
-  const color: Record<string, string> = {
-    FREE: '#718096',
-    PRO: '#3182ce',
-    ENTERPRISE: '#805ad5',
+  const label = tier === 'ENTERPRISE' ? 'ENT' : tier;
+  const cls: Record<string, string> = {
+    FREE: 'bg-slate-100 text-slate-600',
+    PRO: 'bg-blue-100 text-blue-800',
+    ENTERPRISE: 'bg-purple-100 text-purple-800',
   };
-  const statusColor = status === 'ACTIVE' ? '' : ';opacity:.6';
-  return `<span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:.75rem;font-weight:700;background:${color[tier] ?? '#718096'}22;color:${color[tier] ?? '#718096'}${statusColor}">${tier}${status !== 'ACTIVE' ? ` (${status})` : ''}</span>`;
+  const dimmed = status !== 'ACTIVE' ? ' opacity-60' : '';
+  return `<span class="px-2 py-1 rounded-full font-label-caps text-[10px]${dimmed} ${cls[tier] ?? 'bg-slate-100 text-slate-600'}">${label}${status !== 'ACTIVE' ? ` (${status})` : ''}</span>`;
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
-/**
- * GET /admin
- * Main admin dashboard. Protected by adminAuth middleware.
- * Access: /admin?secret=YOUR_ADMIN_SECRET
- */
 router.get('/', async (req: Request, res: Response) => {
   const secret = (req as any).adminSecret as string;
   const portals = await getAllPortals();
@@ -49,127 +46,147 @@ router.get('/', async (req: Request, res: Response) => {
   const rows = portals.map((p) => {
     const limit = p.tierLimit;
     const pct = limit === null ? 100 : Math.min(100, Math.round((p.monthlyCount / limit) * 100));
-    const barColor = pct >= 90 ? '#fc8181' : pct >= 70 ? '#f6ad55' : '#68d391';
+    const barColor = pct >= 90 ? 'bg-error' : pct >= 70 ? 'bg-yellow-500' : 'bg-tertiary';
+    const subStatus = p.paypalSubscriptionId
+      ? `<span class="flex items-center gap-1 text-tertiary font-body-sm text-body-sm"><span class="material-symbols-outlined text-[16px]">check_circle</span> Active</span>`
+      : `<span class="flex items-center gap-1 text-secondary opacity-50 font-body-sm text-body-sm"><span class="material-symbols-outlined text-[16px]">cancel</span> None</span>`;
 
     return `
-    <tr>
-      <td><code>${p.portalId}</code></td>
-      <td>${p.hubDomain ?? '—'}</td>
-      <td>${tierBadge(p.tier, p.status)}</td>
-      <td>
-        <div style="display:flex;align-items:center;gap:8px">
-          <div style="flex:1;background:#e2e8f0;border-radius:4px;height:8px;min-width:80px">
-            <div style="width:${pct}%;background:${barColor};height:8px;border-radius:4px"></div>
+    <tr class="border-b border-[#e5e7eb] hover:bg-[#f9fafb] transition-colors group">
+      <td class="p-4 font-mono text-xs text-on-surface-variant">${p.portalId}</td>
+      <td class="p-4 font-medium text-on-surface font-body-sm text-body-sm">${p.hubDomain ?? '—'}</td>
+      <td class="p-4">${tierBadge(p.tier, p.status)}</td>
+      <td class="p-4">
+        <div class="flex items-center gap-2">
+          <div class="flex-1 bg-slate-200 rounded-full h-1.5 min-w-[80px]">
+            <div class="${barColor} h-1.5 rounded-full" style="width:${pct}%"></div>
           </div>
-          <span style="font-size:.8rem;color:#4a5568;white-space:nowrap">
-            ${p.monthlyCount} / ${limit === null ? '∞' : limit}
-          </span>
+          <span class="text-xs text-secondary whitespace-nowrap">${p.monthlyCount} / ${limit === null ? '∞' : limit}</span>
         </div>
       </td>
-      <td style="font-size:.8rem;color:#718096">${fmtDate(p.installedAt)}</td>
-      <td style="font-size:.75rem;color:#a0aec0">${p.paypalSubscriptionId ? `<code>${p.paypalSubscriptionId.slice(0, 18)}…</code>` : '—'}</td>
-      <td>
-        <form action="/admin/set-tier?secret=${encodeURIComponent(secret)}" method="POST" style="display:flex;gap:4px">
+      <td class="p-4 font-body-sm text-body-sm text-on-surface-variant">${fmtDate(p.installedAt)}</td>
+      <td class="p-4">${subStatus}</td>
+      <td class="p-4 text-right">
+        <form action="/admin/set-tier?secret=${encodeURIComponent(secret)}" method="POST" class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <input type="hidden" name="portalId" value="${p.portalId}">
-          <select name="tier" style="font-size:.8rem;padding:3px 6px;border:1px solid #e2e8f0;border-radius:5px">
+          <select name="tier" class="border border-[#e5e7eb] rounded px-2 py-1 text-xs outline-none focus:border-primary-container">
             ${['FREE', 'PRO', 'ENTERPRISE'].map((t) => `<option value="${t}"${t === p.tier ? ' selected' : ''}>${t}</option>`).join('')}
           </select>
-          <button type="submit" style="font-size:.8rem;padding:3px 10px;background:#4a5568;color:#fff;border:none;border-radius:5px;cursor:pointer">Set</button>
+          <button type="submit" class="bg-surface-variant text-on-surface-variant px-3 py-1 rounded text-xs font-medium hover:bg-surface-tint hover:text-white transition-colors">Set</button>
         </form>
       </td>
     </tr>`;
   }).join('');
 
   res.send(`<!doctype html>
-<html lang="en">
+<html class="light" lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Admin — Flow Enroll</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f7f8fa;color:#1a202c}
-    header{background:#1a202c;color:#fff;padding:16px 32px;display:flex;align-items:center;justify-content:space-between}
-    header h1{font-size:1.1rem;font-weight:600}
-    header span{font-size:.8rem;color:#a0aec0}
-    .wrap{max-width:1200px;margin:0 auto;padding:32px}
-    .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px}
-    .stat{background:#fff;border-radius:10px;padding:20px 24px;border:1px solid #e2e8f0}
-    .stat .label{font-size:.78rem;color:#718096;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
-    .stat .value{font-size:2rem;font-weight:700;color:#1a202c}
-    .stat .sub{font-size:.78rem;color:#a0aec0;margin-top:2px}
-    .section{background:#fff;border-radius:10px;border:1px solid #e2e8f0;overflow:hidden}
-    .section-header{padding:16px 24px;border-bottom:1px solid #e2e8f0;font-weight:600;font-size:.95rem;color:#2d3748}
-    table{width:100%;border-collapse:collapse}
-    th{text-align:left;padding:10px 16px;font-size:.75rem;color:#718096;text-transform:uppercase;letter-spacing:.04em;background:#f7f8fa;border-bottom:1px solid #e2e8f0}
-    td{padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:.87rem;vertical-align:middle}
-    tr:last-child td{border-bottom:none}
-    tr:hover td{background:#fafafa}
-    code{background:#f0f0f0;padding:1px 5px;border-radius:3px;font-size:.82rem}
-    .empty{padding:48px;text-align:center;color:#a0aec0}
-  </style>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Flow Enroll - Super Admin</title>
+${TAILWIND_SETUP}
 </head>
-<body>
-<header>
-  <h1>Super Admin</h1>
-  <span>Flow Enroll</span>
-</header>
-<div class="wrap">
-  <div class="cards">
-    <div class="stat">
-      <div class="label">Total Portals</div>
-      <div class="value">${totalPortals}</div>
-      <div class="sub">installed all time</div>
+<body class="bg-[#f7f8fa] text-on-background min-h-screen flex flex-col font-body-base">
+<header class="bg-[#1a202c] sticky top-0 z-50 shadow-sm border-b border-slate-800">
+  <div class="flex justify-between items-center w-full px-8 h-16 max-w-[1280px] mx-auto">
+    <div class="flex items-center gap-4">
+      <span class="text-xl font-black text-white">Super Admin</span>
     </div>
-    <div class="stat">
-      <div class="label">Paid Portals</div>
-      <div class="value">${paidPortals}</div>
-      <div class="sub">Pro + Enterprise</div>
-    </div>
-    <div class="stat">
-      <div class="label">Enrollments This Month</div>
-      <div class="value">${totalEnrollments.toLocaleString()}</div>
-      <div class="sub">across all portals</div>
-    </div>
-    <div class="stat">
-      <div class="label">Est. MRR</div>
-      <div class="value">$${mrr.toLocaleString()}</div>
-      <div class="sub">USD / month</div>
+    <nav class="hidden md:flex items-center gap-6 font-['Inter'] text-sm font-medium tracking-tight">
+      <a class="text-white opacity-100 border-b-2 border-[#ff7a59] pb-1 hover:text-white transition-all duration-200" href="/admin?secret=${encodeURIComponent(secret)}">Dashboard</a>
+    </nav>
+    <div class="flex items-center gap-4">
+      <span class="text-sm font-medium text-[#ff7a59]">Flow Enroll</span>
     </div>
   </div>
-
-  <div class="section">
-    <div class="section-header">Installed Portals (${totalPortals})</div>
-    ${portals.length === 0
-      ? '<div class="empty">No portals have installed the app yet.</div>'
-      : `<table>
+</header>
+<main class="flex-grow w-full max-w-[1280px] mx-auto px-8 py-margin-page">
+  <div class="mb-8 flex justify-between items-end">
+    <div>
+      <h1 class="font-h1 text-h1 text-on-surface">Platform Overview</h1>
+      <p class="font-body-base text-body-base text-on-surface-variant mt-2">Global metrics and portal management.</p>
+    </div>
+  </div>
+  <!-- Stats Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter mb-8">
+    <div class="bg-surface-container-lowest rounded-xl p-card-padding shadow-[0_1px_4px_rgba(0,0,0,0.08)] border border-[#e5e7eb] flex flex-col justify-between">
+      <div class="flex justify-between items-start mb-4">
+        <span class="font-label-caps text-label-caps text-secondary uppercase">Total Portals</span>
+        <span class="material-symbols-outlined text-secondary opacity-50">domain</span>
+      </div>
+      <div>
+        <div class="font-h1 text-h1 text-on-surface">${totalPortals.toLocaleString()}</div>
+        <div class="font-body-sm text-body-sm text-secondary mt-1">installed all time</div>
+      </div>
+    </div>
+    <div class="bg-surface-container-lowest rounded-xl p-card-padding shadow-[0_1px_4px_rgba(0,0,0,0.08)] border border-[#e5e7eb] flex flex-col justify-between">
+      <div class="flex justify-between items-start mb-4">
+        <span class="font-label-caps text-label-caps text-secondary uppercase">Paid Portals</span>
+        <span class="material-symbols-outlined text-secondary opacity-50">verified</span>
+      </div>
+      <div>
+        <div class="font-h1 text-h1 text-on-surface">${paidPortals.toLocaleString()}</div>
+        <div class="font-body-sm text-body-sm text-secondary mt-1">Pro + Enterprise</div>
+      </div>
+    </div>
+    <div class="bg-surface-container-lowest rounded-xl p-card-padding shadow-[0_1px_4px_rgba(0,0,0,0.08)] border border-[#e5e7eb] flex flex-col justify-between">
+      <div class="flex justify-between items-start mb-4">
+        <span class="font-label-caps text-label-caps text-secondary uppercase">Enrollments This Month</span>
+        <span class="material-symbols-outlined text-secondary opacity-50">group_add</span>
+      </div>
+      <div>
+        <div class="font-h1 text-h1 text-on-surface">${totalEnrollments.toLocaleString()}</div>
+        <div class="font-body-sm text-body-sm text-secondary mt-1">across all portals</div>
+      </div>
+    </div>
+    <div class="bg-surface-container-lowest rounded-xl p-card-padding shadow-[0_1px_4px_rgba(0,0,0,0.08)] border border-[#e5e7eb] flex flex-col justify-between">
+      <div class="flex justify-between items-start mb-4">
+        <span class="font-label-caps text-label-caps text-secondary uppercase">Est. MRR</span>
+        <span class="material-symbols-outlined text-secondary opacity-50">payments</span>
+      </div>
+      <div>
+        <div class="font-h1 text-h1 text-on-surface">$${mrr.toLocaleString()}</div>
+        <div class="font-body-sm text-body-sm text-secondary mt-1">USD / month</div>
+      </div>
+    </div>
+  </div>
+  <!-- Portals Table -->
+  <div class="bg-surface-container-lowest rounded-xl shadow-[0_1px_4px_rgba(0,0,0,0.08)] border border-[#e5e7eb] overflow-hidden">
+    <div class="p-6 border-b border-[#e5e7eb] flex justify-between items-center bg-white">
+      <h2 class="font-h3 text-h3 text-on-surface">Active Portals (${totalPortals})</h2>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse">
         <thead>
-          <tr>
-            <th>Portal ID</th>
-            <th>Domain</th>
-            <th>Tier</th>
-            <th>This Month</th>
-            <th>Installed</th>
-            <th>PayPal Sub</th>
-            <th>Override</th>
+          <tr class="bg-[#f9fafb] border-b border-[#e5e7eb]">
+            <th class="p-4 font-label-caps text-label-caps text-secondary uppercase tracking-wider">Portal ID</th>
+            <th class="p-4 font-label-caps text-label-caps text-secondary uppercase tracking-wider">Domain</th>
+            <th class="p-4 font-label-caps text-label-caps text-secondary uppercase tracking-wider">Tier</th>
+            <th class="p-4 font-label-caps text-label-caps text-secondary uppercase tracking-wider w-48">This Month</th>
+            <th class="p-4 font-label-caps text-label-caps text-secondary uppercase tracking-wider">Installed</th>
+            <th class="p-4 font-label-caps text-label-caps text-secondary uppercase tracking-wider">PayPal Sub</th>
+            <th class="p-4 font-label-caps text-label-caps text-secondary uppercase tracking-wider text-right">Override</th>
           </tr>
         </thead>
-        <tbody>${rows}</tbody>
-      </table>`
-    }
+        <tbody class="font-body-sm text-body-sm">
+          ${portals.length === 0
+            ? `<tr><td colspan="7" class="p-12 text-center font-body-base text-body-base text-on-surface-variant">No portals have installed the app yet.</td></tr>`
+            : rows}
+        </tbody>
+      </table>
+    </div>
+    <div class="p-4 border-t border-[#e5e7eb] bg-[#f9fafb] flex justify-between items-center">
+      <span class="font-body-sm text-body-sm text-secondary">Showing ${portals.length} portal${portals.length !== 1 ? 's' : ''}</span>
+    </div>
   </div>
-</div>
+</main>
+${FOOTER}
 </body>
 </html>`);
 });
 
 // ── Tier override ─────────────────────────────────────────────────────────────
 
-/**
- * POST /admin/set-tier
- * Override a portal's tier manually. Useful for grandfathered accounts,
- * refunds, or manual deals.
- */
 router.post('/set-tier', async (req: Request, res: Response) => {
   const portalId = parseInt(req.body.portalId ?? '', 10);
   const tier = String(req.body.tier ?? 'FREE').toUpperCase();

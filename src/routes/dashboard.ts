@@ -1,57 +1,58 @@
 import { Router, Request, Response } from 'express';
 import { getSequenceCounts } from '../db';
 import { getSequenceStatsMap } from '../hubspot';
+import { TAILWIND_SETUP, FOOTER } from '../ui';
 
 const router = Router();
 
-function pct(val: number | null): string {
-  if (val === null || val === undefined) return '—';
-  return (val * 100).toFixed(1) + '%';
-}
-
-function statCell(val: number | null): string {
-  if (val === null || val === undefined) return '<td style="color:#a0aec0;text-align:center">—</td>';
+function statBadge(val: number | null): string {
+  if (val === null || val === undefined) {
+    return `<td class="py-4 px-6 text-center font-body-sm text-body-sm text-on-surface-variant">—</td>`;
+  }
   const v = val * 100;
-  const color = v >= 50 ? '#276749' : v >= 25 ? '#744210' : '#742a2a';
-  const bg    = v >= 50 ? '#c6f6d5' : v >= 25 ? '#fefcbf' : '#fff5f5';
-  return `<td style="text-align:center"><span style="background:${bg};color:${color};padding:2px 8px;border-radius:12px;font-size:.8rem;font-weight:600">${v.toFixed(1)}%</span></td>`;
+  const cls = v >= 50 ? 'bg-[#ecfdf5] text-[#065f46]' : v >= 25 ? 'bg-[#fef3c7] text-[#92400e]' : 'bg-[#fef2f2] text-[#991b1b]';
+  return `<td class="py-4 px-6 text-center"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cls}">${v.toFixed(1)}%</span></td>`;
 }
 
-/**
- * GET /dashboard?portalId=X
- * Per-portal sequence performance dashboard.
- */
+function dotColor(openRate: number | null): string {
+  if (openRate === null) return '#a0aec0';
+  const v = openRate * 100;
+  return v >= 50 ? '#10b981' : v >= 25 ? '#f59e0b' : '#ef4444';
+}
+
 router.get('/', async (req: Request, res: Response) => {
   const portalId = parseInt(req.query.portalId as string ?? '', 10);
 
-  // No portalId — show an entry form
   if (isNaN(portalId)) {
     res.send(`<!doctype html>
-<html lang="en">
+<html class="light" lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Dashboard — Flow Enroll</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f7f8fa;display:flex;align-items:center;justify-content:center;min-height:100vh}
-    .box{background:#fff;border-radius:12px;padding:48px 40px;max-width:420px;width:100%;box-shadow:0 2px 16px rgba(0,0,0,.08);text-align:center}
-    h2{font-size:1.4rem;font-weight:700;margin-bottom:8px;color:#1a202c}
-    p{color:#718096;font-size:.9rem;margin-bottom:28px}
-    input{width:100%;padding:11px 14px;border:1px solid #e2e8f0;border-radius:7px;font-size:1rem;margin-bottom:12px}
-    button{width:100%;padding:12px;background:#ff7a59;color:#fff;border:none;border-radius:7px;font-size:1rem;font-weight:600;cursor:pointer}
-    button:hover{background:#f56444}
-  </style>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dashboard — Flow Enroll</title>
+${TAILWIND_SETUP}
 </head>
-<body>
-  <div class="box">
-    <h2>Sequence Dashboard</h2>
-    <p>Enter your HubSpot portal ID to view your sequence performance.</p>
-    <form action="/dashboard" method="GET">
-      <input type="number" name="portalId" placeholder="Portal ID (e.g. 12345678)" required autofocus>
-      <button type="submit">View Dashboard</button>
-    </form>
+<body class="bg-background min-h-screen flex items-center justify-center p-6 antialiased">
+<div class="w-full max-w-[420px] bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant p-[24px] flex flex-col items-center text-center">
+  <div class="mb-6 flex items-center justify-center w-16 h-16 rounded-full bg-primary-container/10">
+    <span class="material-symbols-outlined text-[32px] text-primary-container">insert_chart</span>
   </div>
+  <h1 class="font-h2 text-h2 text-on-surface mb-3">Sequence Dashboard</h1>
+  <p class="font-body-base text-body-base text-on-surface-variant mb-8">
+    Enter your HubSpot portal ID to view your sequence performance.
+  </p>
+  <form action="/dashboard" method="GET" class="w-full flex flex-col gap-4">
+    <input
+      type="number" name="portalId"
+      placeholder="Portal ID (e.g. 12345678)"
+      required autofocus
+      class="w-full px-4 py-3 border border-outline-variant rounded-lg font-body-base text-body-base bg-white focus:outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20 transition-all"
+    />
+    <button type="submit" class="w-full bg-primary-container text-white px-4 py-3 rounded-lg font-button-text text-button-text hover:opacity-90 transition-opacity shadow-sm">
+      View Dashboard
+    </button>
+  </form>
+</div>
 </body>
 </html>`);
     return;
@@ -69,109 +70,139 @@ router.get('/', async (req: Request, res: Response) => {
     const rows = usageRows.map((r) => {
       const s = statsMap.get(r.sequenceId);
       const name = s?.name ?? `Sequence ${r.sequenceId}`;
+      const dot = dotColor(s?.openRate ?? null);
       return `
-      <tr>
-        <td style="font-weight:500">${name}</td>
-        <td style="text-align:center;font-weight:600;color:#2d3748">${r.thisMonth.toLocaleString()}</td>
-        <td style="text-align:center;color:#718096">${r.allTime.toLocaleString()}</td>
-        ${statCell(s?.openRate ?? null)}
-        ${statCell(s?.clickRate ?? null)}
-        ${statCell(s?.replyRate ?? null)}
-        ${statCell(s?.meetingRate ?? null)}
+      <tr class="hover:bg-surface-container-lowest/80 transition-colors">
+        <td class="py-4 px-6 font-medium text-on-background">
+          <div class="flex items-center gap-3">
+            <div class="w-2 h-2 rounded-full flex-shrink-0" style="background:${dot}"></div>
+            ${name}
+          </div>
+        </td>
+        <td class="py-4 px-6 text-right font-body-sm text-body-sm">${r.thisMonth.toLocaleString()}</td>
+        <td class="py-4 px-6 text-right font-body-sm text-body-sm">${r.allTime.toLocaleString()}</td>
+        ${statBadge(s?.openRate ?? null)}
+        ${statBadge(s?.clickRate ?? null)}
+        ${statBadge(s?.replyRate ?? null)}
+        ${statBadge(s?.meetingRate ?? null)}
       </tr>`;
     }).join('');
 
-    const statsNote = statsMap.size > 0 && [...statsMap.values()].some(s => s.openRate !== null)
-      ? ''
-      : `<div style="background:#fffbeb;border:1px solid #f6e05e;border-radius:8px;padding:12px 16px;font-size:.83rem;color:#744210;margin-bottom:24px">
-          Open, click, reply and meeting rates are fetched live from HubSpot. If they show — your HubSpot plan may not expose these stats via API.
-         </div>`;
+    const emptyState = `
+    <tr>
+      <td colspan="7" class="py-16 text-center font-body-base text-body-base text-on-surface-variant">
+        No enrollments tracked yet. Enroll contacts via a workflow to see data here.
+      </td>
+    </tr>`;
 
     res.send(`<!doctype html>
-<html lang="en">
+<html class="light" lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Dashboard — Flow Enroll</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f7f8fa;color:#1a202c}
-    header{background:#1a202c;color:#fff;padding:16px 32px;display:flex;align-items:center;justify-content:space-between}
-    header h1{font-size:1.1rem;font-weight:600}
-    header a{color:#a0aec0;font-size:.85rem;text-decoration:none}
-    header a:hover{color:#fff}
-    .wrap{max-width:1100px;margin:0 auto;padding:32px 24px}
-    .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px}
-    .stat{background:#fff;border-radius:10px;padding:20px 24px;border:1px solid #e2e8f0}
-    .stat .label{font-size:.78rem;color:#718096;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
-    .stat .value{font-size:2rem;font-weight:700;color:#1a202c}
-    .stat .sub{font-size:.78rem;color:#a0aec0;margin-top:2px}
-    .section{background:#fff;border-radius:10px;border:1px solid #e2e8f0;overflow:hidden}
-    .section-header{padding:16px 24px;border-bottom:1px solid #e2e8f0;font-weight:600;font-size:.95rem;display:flex;align-items:center;justify-content:space-between}
-    .section-header span{font-size:.8rem;color:#a0aec0;font-weight:400}
-    table{width:100%;border-collapse:collapse}
-    th{text-align:left;padding:10px 16px;font-size:.75rem;color:#718096;text-transform:uppercase;letter-spacing:.04em;background:#f7f8fa;border-bottom:1px solid #e2e8f0}
-    th.center{text-align:center}
-    td{padding:13px 16px;border-bottom:1px solid #f0f0f0;font-size:.87rem;vertical-align:middle}
-    tr:last-child td{border-bottom:none}
-    tr:hover td{background:#fafafa}
-    .empty{padding:48px;text-align:center;color:#a0aec0;font-size:.9rem}
-    @media(max-width:700px){.cards{grid-template-columns:1fr}}
-  </style>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Flow Enroll Portal Dashboard</title>
+${TAILWIND_SETUP}
 </head>
-<body>
-<header>
-  <h1>Sequence Dashboard — Portal ${portalId}</h1>
-  <div style="display:flex;gap:20px">
-    <a href="https://app.hubspot.com">HubSpot ↗</a>
-    <a href="/pricing?portalId=${portalId}">Upgrade plan</a>
+<body class="bg-background text-on-background min-h-screen flex flex-col">
+<header class="bg-[#1a202c] sticky top-0 z-50 shadow-sm border-b border-slate-800">
+  <div class="flex justify-between items-center w-full px-8 h-16 max-w-[1280px] mx-auto">
+    <div class="flex items-center gap-8">
+      <a href="/" class="text-xl font-black text-white">Flow Enroll</a>
+      <nav class="hidden md:flex gap-6 font-['Inter'] text-sm font-medium tracking-tight">
+        <a class="text-white opacity-100 border-b-2 border-[#ff7a59] pb-1 hover:text-white transition-all duration-200" href="/dashboard?portalId=${portalId}">Dashboard</a>
+      </nav>
+    </div>
+    <div class="flex items-center gap-4 font-['Inter'] text-sm font-medium tracking-tight">
+      <a class="text-white opacity-70 hover:opacity-100 hover:text-white transition-all duration-200" href="mailto:support@flowenroll.io">Support</a>
+    </div>
   </div>
 </header>
-<div class="wrap">
-  <div class="cards">
-    <div class="stat">
-      <div class="label">Enrollments This Month</div>
-      <div class="value">${totalThisMonth.toLocaleString()}</div>
-      <div class="sub">via this app</div>
+<main class="flex-grow w-full max-w-[1280px] mx-auto px-4 md:px-8 py-8 flex flex-col gap-8">
+  <!-- Header -->
+  <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div>
+      <h1 class="font-h1 text-h1 text-on-background">Sequence Dashboard</h1>
+      <p class="font-body-base text-body-base text-on-surface-variant">Portal ${portalId}</p>
     </div>
-    <div class="stat">
-      <div class="label">Enrollments All Time</div>
-      <div class="value">${totalAllTime.toLocaleString()}</div>
-      <div class="sub">via this app</div>
-    </div>
-    <div class="stat">
-      <div class="label">Active Sequences</div>
-      <div class="value">${usageRows.length}</div>
-      <div class="sub">enrolled via this app</div>
+    <div class="flex gap-4">
+      <a href="https://app.hubspot.com" class="bg-surface-container-lowest border border-outline-variant text-on-surface px-4 py-2 rounded-lg font-button-text text-button-text hover:bg-surface-container transition-colors shadow-sm">HubSpot</a>
+      <a href="/pricing?portalId=${portalId}" class="bg-primary-container text-white px-4 py-2 rounded-lg font-button-text text-button-text hover:opacity-90 transition-opacity shadow-sm">Upgrade</a>
     </div>
   </div>
-
-  ${statsNote}
-
-  <div class="section">
-    <div class="section-header">
-      Sequence Performance
-      <span>Enrollment counts tracked by this app · Rates fetched live from HubSpot</span>
+  <!-- Warning Banner -->
+  <div class="bg-[#fef3c7] border border-[#f5d0fe] rounded-lg p-4 flex items-start gap-3 shadow-sm">
+    <span class="material-symbols-outlined text-[#d97706] mt-0.5">warning</span>
+    <div>
+      <p class="font-body-base text-body-base text-[#92400e] font-medium">Live Data Notice</p>
+      <p class="font-body-sm text-body-sm text-[#92400e] opacity-90 mt-1">Open, click, reply and meeting rates are fetched live from your connected CRM. Depending on volume, this may take a few moments to fully populate.</p>
     </div>
-    ${usageRows.length === 0
-      ? '<div class="empty">No enrollments tracked yet. Enroll contacts via a workflow to see data here.</div>'
-      : `<table>
+  </div>
+  <!-- Stats Grid -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="bg-surface-container-lowest rounded-xl p-card-padding border border-outline-variant shadow-sm relative overflow-hidden group">
+      <div class="absolute -right-6 -top-6 w-24 h-24 bg-primary-container/10 rounded-full blur-2xl group-hover:bg-primary-container/20 transition-all"></div>
+      <div class="flex justify-between items-start mb-4 relative z-10">
+        <h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase">Enrollments This Month</h3>
+        <span class="material-symbols-outlined text-primary-container bg-primary-container/10 p-1.5 rounded-lg">trending_up</span>
+      </div>
+      <div class="relative z-10">
+        <p class="font-h1 text-h1 text-on-background">${totalThisMonth.toLocaleString()}</p>
+        <p class="font-body-sm text-body-sm text-secondary mt-1">via this app</p>
+      </div>
+    </div>
+    <div class="bg-surface-container-lowest rounded-xl p-card-padding border border-outline-variant shadow-sm relative overflow-hidden group">
+      <div class="absolute -right-6 -top-6 w-24 h-24 bg-tertiary-container/10 rounded-full blur-2xl group-hover:bg-tertiary-container/20 transition-all"></div>
+      <div class="flex justify-between items-start mb-4 relative z-10">
+        <h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase">Enrollments All Time</h3>
+        <span class="material-symbols-outlined text-tertiary-container bg-tertiary-container/10 p-1.5 rounded-lg">database</span>
+      </div>
+      <div class="relative z-10">
+        <p class="font-h1 text-h1 text-on-background">${totalAllTime.toLocaleString()}</p>
+        <p class="font-body-sm text-body-sm text-secondary mt-1">via this app</p>
+      </div>
+    </div>
+    <div class="bg-surface-container-lowest rounded-xl p-card-padding border border-outline-variant shadow-sm relative overflow-hidden group">
+      <div class="absolute -right-6 -top-6 w-24 h-24 bg-[#3b82f6]/10 rounded-full blur-2xl group-hover:bg-[#3b82f6]/20 transition-all"></div>
+      <div class="flex justify-between items-start mb-4 relative z-10">
+        <h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase">Active Sequences</h3>
+        <span class="material-symbols-outlined text-[#3b82f6] bg-[#3b82f6]/10 p-1.5 rounded-lg">all_inbox</span>
+      </div>
+      <div class="relative z-10">
+        <p class="font-h1 text-h1 text-on-background">${usageRows.length}</p>
+        <p class="font-body-sm text-body-sm text-secondary mt-1">enrolled via this app</p>
+      </div>
+    </div>
+  </div>
+  <!-- Performance Table -->
+  <div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+    <div class="p-6 border-b border-outline-variant flex justify-between items-center bg-surface-bright">
+      <h2 class="font-h2 text-h2 text-on-background">Sequence Performance</h2>
+      <span class="font-body-sm text-body-sm text-on-surface-variant">Enrollment counts tracked by this app · Rates fetched live from HubSpot</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse">
         <thead>
-          <tr>
-            <th>Sequence</th>
-            <th class="center">This Month</th>
-            <th class="center">All Time</th>
-            <th class="center">Open Rate</th>
-            <th class="center">Click Rate</th>
-            <th class="center">Reply Rate</th>
-            <th class="center">Meeting Rate</th>
+          <tr class="border-b border-outline-variant bg-surface-container-highest/30">
+            <th class="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase">Sequence Name</th>
+            <th class="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase text-right">This Month</th>
+            <th class="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase text-right">All Time</th>
+            <th class="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase text-center">Open Rate</th>
+            <th class="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase text-center">Click Rate</th>
+            <th class="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase text-center">Reply Rate</th>
+            <th class="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase text-center">Meeting Rate</th>
           </tr>
         </thead>
-        <tbody>${rows}</tbody>
-      </table>`
-    }
+        <tbody class="font-body-sm text-body-sm text-on-background divide-y divide-outline-variant/50">
+          ${usageRows.length === 0 ? emptyState : rows}
+        </tbody>
+      </table>
+    </div>
+    <div class="p-4 border-t border-outline-variant bg-surface-bright flex justify-between items-center font-body-sm text-body-sm text-on-surface-variant">
+      <span>Showing ${usageRows.length} sequence${usageRows.length !== 1 ? 's' : ''}</span>
+    </div>
   </div>
-</div>
+</main>
+${FOOTER}
 </body>
 </html>`);
   } catch (err: any) {

@@ -2,14 +2,10 @@ import { Router } from 'express';
 import { config } from '../config';
 import { exchangeCode } from '../hubspot';
 import { saveToken, savePortalInfo } from '../db';
+import { TAILWIND_SETUP } from '../ui';
 
 const router = Router();
 
-/**
- * GET /auth/install
- * Redirect to HubSpot's OAuth authorization page.
- * Share this URL (or the homepage /) with anyone who needs to install the app.
- */
 router.get('/install', (_req, res) => {
   const params = new URLSearchParams({
     client_id: config.hubspot.clientId,
@@ -19,12 +15,6 @@ router.get('/install', (_req, res) => {
   res.redirect(`https://app.hubspot.com/oauth/authorize?${params}`);
 });
 
-/**
- * GET /auth/callback
- * HubSpot redirects here after the user authorizes the app.
- * Saves the tokens then redirects to the pricing page so the user can choose
- * (or upgrade to) a plan.
- */
 router.get('/callback', async (req, res) => {
   const { code, error, error_description } = req.query;
 
@@ -58,44 +48,47 @@ router.get('/callback', async (req, res) => {
   }
 });
 
-/**
- * GET /auth/success
- * Shown after a successful OAuth install. No install button — breaks the loop.
- */
 router.get('/success', (req, res) => {
   const portalId = String(req.query.portalId ?? '');
   res.send(`<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Installed — Flow Enroll</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f7f8fa;display:flex;align-items:center;justify-content:center;min-height:100vh}
-    .box{background:#fff;border-radius:12px;padding:48px 40px;max-width:480px;width:100%;text-align:center;box-shadow:0 2px 16px rgba(0,0,0,.08)}
-    .icon{font-size:3rem;margin-bottom:16px}
-    h2{font-size:1.6rem;font-weight:700;margin-bottom:12px;color:#1a202c}
-    p{color:#718096;line-height:1.6;margin-bottom:28px}
-    .actions{display:flex;flex-direction:column;gap:12px}
-    a{display:inline-block;padding:13px 28px;border-radius:7px;text-decoration:none;font-weight:600;font-size:.95rem}
-    .btn-primary{background:#ff7a59;color:#fff}
-    .btn-primary:hover{background:#f56444}
-    .btn-outline{background:#fff;color:#4a5568;border:1px solid #e2e8f0}
-    .btn-outline:hover{background:#f7f8fa}
-  </style>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Flow Enroll - App Installed Successfully</title>
+${TAILWIND_SETUP}
 </head>
-<body>
-  <div class="box">
-    <div class="icon">✅</div>
-    <h2>App installed successfully!</h2>
-    <p>Portal <strong>${portalId}</strong> is connected. You can now use the Enroll in Sequence, Unenroll from Sequence, and Random Branch actions in any HubSpot workflow.</p>
-    <div class="actions">
-      <a href="https://app.hubspot.com" class="btn-primary">Go to HubSpot</a>
-      <a href="/dashboard?portalId=${portalId}" class="btn-outline">View my dashboard</a>
-      <a href="/pricing?portalId=${portalId}" class="btn-outline">View pricing &amp; upgrade</a>
-    </div>
+<body class="bg-background min-h-screen flex items-center p-6 antialiased flex-col justify-between">
+<main class="w-full max-w-[420px] bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant p-[24px] flex flex-col items-center text-center relative overflow-hidden my-auto">
+  <div class="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-48 bg-tertiary-container/10 blur-[40px] rounded-full pointer-events-none"></div>
+  <div class="relative z-10 mb-6 flex items-center justify-center w-16 h-16 rounded-full bg-tertiary-container/20 ring-4 ring-surface-container-lowest">
+    <span class="material-symbols-outlined text-[32px] text-tertiary" style="font-variation-settings: 'FILL' 1;">check_circle</span>
   </div>
+  <h1 class="font-h2 text-h2 text-on-surface mb-3 relative z-10">App installed successfully!</h1>
+  <p class="font-body-base text-body-base text-on-surface-variant mb-8 relative z-10">
+    Portal <span class="font-medium text-on-surface">${portalId}</span> is connected and authenticated. You can now use all three workflow actions in HubSpot.
+  </p>
+  <div class="flex flex-col gap-[16px] w-full relative z-10">
+    <a href="https://app.hubspot.com" class="w-full inline-flex justify-center items-center gap-2 px-4 py-3 bg-primary hover:bg-primary-container text-on-primary font-button-text text-button-text rounded-lg transition-all duration-200 active:scale-[0.98] shadow-sm">
+      Go to HubSpot
+      <span class="material-symbols-outlined text-[18px]">open_in_new</span>
+    </a>
+    <a href="/dashboard?portalId=${portalId}" class="w-full inline-flex justify-center items-center px-4 py-3 bg-surface-container-lowest hover:bg-surface-container border border-outline-variant text-on-surface font-button-text text-button-text rounded-lg transition-colors duration-200">
+      View My Dashboard
+    </a>
+    <a href="/pricing?portalId=${portalId}" class="w-full inline-flex justify-center items-center px-4 py-3 bg-surface-container-lowest hover:bg-surface-container border border-outline-variant text-on-surface font-button-text text-button-text rounded-lg transition-colors duration-200">
+      View Pricing &amp; Upgrade
+    </a>
+  </div>
+</main>
+<footer class="w-full max-w-[420px] py-6 flex flex-col items-center gap-2">
+  <div class="flex gap-4">
+    <a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Privacy Policy</a>
+    <a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="#">Terms of Service</a>
+    <a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors" href="mailto:support@flowenroll.io">Support</a>
+  </div>
+  <p class="font-body-sm text-body-sm text-on-surface-variant/60">© 2026 Flow Enroll. All rights reserved.</p>
+</footer>
 </body>
 </html>`);
 });

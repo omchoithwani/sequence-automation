@@ -8,6 +8,7 @@ import pricingRoutes, { handlePayPalWebhook } from './routes/pricing';
 import adminRoutes from './routes/admin';
 import dashboardRoutes from './routes/dashboard';
 import { validateHubSpotSignature } from './middleware/signature';
+import { TAILWIND_SETUP, topNav, FOOTER } from './ui';
 
 const app = express();
 
@@ -22,66 +23,115 @@ app.use(express.urlencoded({ extended: true }));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-// Public landing page — Install button for you and your clients
 app.get('/', (_req, res) => {
   res.send(`<!doctype html>
-<html lang="en">
+<html class="light" lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Flow Enroll</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f7f8fa;color:#1a202c;line-height:1.6}
-    .wrap{max-width:760px;margin:72px auto;padding:0 24px}
-    h1{font-size:2rem;font-weight:700;margin-bottom:12px}
-    .sub{color:#718096;font-size:1.05rem;margin-bottom:40px}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:44px}
-    .card{background:#fff;border-radius:10px;padding:22px 24px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
-    .card .badge{display:inline-block;font-size:.7rem;font-weight:600;background:#ebf8ff;color:#2b6cb0;border-radius:4px;padding:2px 7px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em}
-    .card h3{font-size:.95rem;font-weight:600;margin-bottom:6px}
-    .card p{font-size:.85rem;color:#718096}
-    .actions{display:flex;gap:12px;flex-wrap:wrap}
-    .btn{display:inline-block;background:#ff7a59;color:#fff;padding:14px 36px;border-radius:7px;text-decoration:none;font-weight:600;font-size:1rem}
-    .btn:hover{background:#f56444}
-    .btn-outline{background:#fff;color:#4a5568;border:1px solid #e2e8f0;padding:13px 28px}
-    .btn-outline:hover{background:#f7f8fa}
-    .note{margin-top:24px;font-size:.82rem;color:#a0aec0}
-    @media(max-width:540px){.grid{grid-template-columns:1fr}}
-  </style>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Flow Enroll - Enroll contacts into sequences from any workflow</title>
+${TAILWIND_SETUP}
 </head>
-<body>
-  <div class="wrap">
-    <h1>Flow Enroll</h1>
-    <p class="sub">Custom workflow actions that unlock sequence enrollment, unenrollment, and A/B branching — without needing Enterprise.</p>
-    <div class="grid">
-      <div class="card">
-        <div class="badge">Contact · Deal · Company</div>
-        <h3>Enroll in Sequence</h3>
-        <p>Enroll contacts into any sequence from any workflow type. Filter by association label. Choose the sender and email.</p>
-      </div>
-      <div class="card">
-        <div class="badge">Contact · Deal · Company</div>
-        <h3>Unenroll from Sequence</h3>
-        <p>Cancel active sequence enrollments from a workflow. Target a specific sequence or all active ones at once.</p>
-      </div>
-      <div class="card">
-        <div class="badge">Contact · Deal · Company</div>
-        <h3>Random Branch</h3>
-        <p>Split contacts randomly to Branch A or B based on a percentage — for A/B testing messaging or timing.</p>
-      </div>
-      <div class="card">
-        <div class="badge">Free to start</div>
-        <h3>Flexible Pricing</h3>
-        <p>Free for 100 enrollments/month. Upgrade to Pro (1,000) or Enterprise (unlimited) as you scale.</p>
-      </div>
-    </div>
-    <div class="actions">
-      <a href="/auth/install" class="btn">Install on HubSpot</a>
-      <a href="/pricing" class="btn btn-outline">View Pricing</a>
-    </div>
-    <p class="note">Requires Sales Hub Starter or above for sequences.</p>
+<body class="bg-background text-on-background font-body-base antialiased min-h-screen flex flex-col">
+${topNav('landing')}
+<main class="flex-grow w-full max-w-[1280px] mx-auto px-8 py-20 flex flex-col gap-32">
+<!-- Hero Section -->
+<section class="flex flex-col items-center text-center max-w-3xl mx-auto gap-8 pt-12">
+  <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container-high border border-outline-variant/30 text-primary-container font-label-caps text-label-caps shadow-sm">
+    <span class="material-symbols-outlined text-[14px]">bolt</span>
+    <span>NEW ACTION AVAILABLE</span>
   </div>
+  <h1 class="font-h1 text-h1 text-on-surface md:text-[56px] md:leading-[1.1] tracking-tight text-balance">
+    Enroll contacts into sequences from any workflow
+  </h1>
+  <p class="font-body-base text-body-base text-secondary md:text-lg max-w-2xl text-balance">
+    Three powerful workflow actions designed to automate your outreach. Scale your sales process without requiring an Enterprise plan.
+  </p>
+  <div class="flex flex-col sm:flex-row items-center gap-4 mt-4">
+    <a class="bg-primary-container text-white px-6 py-3 rounded-lg font-button-text text-button-text hover:scale-95 transition-all duration-200 shadow-md flex items-center gap-2 w-full sm:w-auto justify-center" href="/auth/install">
+      Install on HubSpot
+    </a>
+    <a class="bg-white text-on-surface border border-outline-variant/50 px-6 py-3 rounded-lg font-button-text text-button-text hover:bg-surface-container-lowest transition-all duration-200 shadow-sm flex items-center gap-2 w-full sm:w-auto justify-center" href="/pricing">
+      View Pricing
+    </a>
+  </div>
+  <div class="mt-8 text-secondary font-body-sm text-body-sm flex items-center gap-2 opacity-80">
+    <span class="material-symbols-outlined text-[16px] text-[#00a4bd]">check_circle</span>
+    Works with Sales Hub Professional &amp; Enterprise
+  </div>
+</section>
+<!-- Feature Grid -->
+<section class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+  <div class="bg-surface-container-lowest rounded-xl p-card-padding border border-outline-variant/30 shadow-[0_1px_4px_rgba(0,0,0,0.08)] flex flex-col gap-6 relative overflow-hidden group hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)] transition-shadow duration-300">
+    <div class="absolute top-0 right-0 w-32 h-32 bg-primary-container/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500"></div>
+    <div class="w-12 h-12 rounded-lg bg-primary-container/10 flex items-center justify-center text-primary-container">
+      <span class="material-symbols-outlined text-[24px]">person_add</span>
+    </div>
+    <div class="flex flex-col gap-2">
+      <h3 class="font-h3 text-h3 text-on-surface">Enroll in Sequence</h3>
+      <p class="font-body-sm text-body-sm text-secondary">
+        Automatically drop contacts into your highest performing sequences directly from any contact, deal, or company workflow.
+      </p>
+    </div>
+    <div class="mt-auto flex flex-wrap gap-2 pt-4 border-t border-outline-variant/20">
+      <span class="px-2 py-1 bg-surface-container text-on-surface-variant font-label-caps text-[10px] rounded-full">Contact Workflows</span>
+      <span class="px-2 py-1 bg-surface-container text-on-surface-variant font-label-caps text-[10px] rounded-full">Deal Workflows</span>
+      <span class="px-2 py-1 bg-surface-container text-on-surface-variant font-label-caps text-[10px] rounded-full">Company Workflows</span>
+    </div>
+  </div>
+  <div class="bg-surface-container-lowest rounded-xl p-card-padding border border-outline-variant/30 shadow-[0_1px_4px_rgba(0,0,0,0.08)] flex flex-col gap-6 relative overflow-hidden group hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)] transition-shadow duration-300">
+    <div class="absolute top-0 right-0 w-32 h-32 bg-error/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500"></div>
+    <div class="w-12 h-12 rounded-lg bg-error/10 flex items-center justify-center text-error">
+      <span class="material-symbols-outlined text-[24px]">person_remove</span>
+    </div>
+    <div class="flex flex-col gap-2">
+      <h3 class="font-h3 text-h3 text-on-surface">Unenroll from Sequence</h3>
+      <p class="font-body-sm text-body-sm text-secondary">
+        Stop outreach instantly. Cancel active sequence enrollments based on custom triggers, deal stage changes, or form submissions.
+      </p>
+    </div>
+    <div class="mt-auto pt-4">
+      <div class="h-2 w-full bg-surface-container rounded-full overflow-hidden">
+        <div class="h-full bg-error w-1/3"></div>
+      </div>
+      <span class="text-[10px] text-secondary mt-1 block font-label-caps">PREVENT UNWANTED EMAILS</span>
+    </div>
+  </div>
+  <div class="bg-surface-container-lowest rounded-xl p-card-padding border border-outline-variant/30 shadow-[0_1px_4px_rgba(0,0,0,0.08)] flex flex-col gap-6 relative overflow-hidden group hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)] transition-shadow duration-300">
+    <div class="absolute top-0 right-0 w-32 h-32 bg-tertiary-container/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500"></div>
+    <div class="w-12 h-12 rounded-lg bg-tertiary-container/20 flex items-center justify-center text-on-tertiary-container">
+      <span class="material-symbols-outlined text-[24px]">call_split</span>
+    </div>
+    <div class="flex flex-col gap-2">
+      <h3 class="font-h3 text-h3 text-on-surface">Random Branch</h3>
+      <p class="font-body-sm text-body-sm text-secondary">
+        A/B test your sequences. Split contacts randomly into up to 5 distinct branches to test different messaging strategies.
+      </p>
+    </div>
+    <div class="mt-auto flex gap-2 pt-4">
+      <div class="flex-1 bg-surface-container h-8 rounded-md flex items-center justify-center text-xs font-medium text-secondary">50% A</div>
+      <div class="flex-1 bg-surface-container h-8 rounded-md flex items-center justify-center text-xs font-medium text-secondary">50% B</div>
+    </div>
+  </div>
+  <div class="bg-[#1a202c] rounded-xl p-card-padding border border-slate-800 shadow-[0_1px_4px_rgba(0,0,0,0.08)] flex flex-col gap-6 relative overflow-hidden group hover:shadow-[0_4px_12px_rgba(0,0,0,0.12)] transition-shadow duration-300 text-white">
+    <div class="absolute top-0 right-0 w-32 h-32 bg-primary-container/10 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500"></div>
+    <div class="w-12 h-12 rounded-lg bg-slate-800 flex items-center justify-center text-white border border-slate-700">
+      <span class="material-symbols-outlined text-[24px]">payments</span>
+    </div>
+    <div class="flex flex-col gap-2">
+      <h3 class="font-h3 text-h3 text-white">Flexible Pricing</h3>
+      <p class="font-body-sm text-body-sm text-slate-400">
+        Start for free. Scale when you need to. First 100 successful enrollments every month are completely free.
+      </p>
+    </div>
+    <div class="mt-auto pt-4 flex items-end gap-2 border-t border-slate-800">
+      <span class="text-3xl font-bold text-white">$0</span>
+      <span class="text-sm text-slate-400 pb-1">/ 100 enrollments</span>
+    </div>
+  </div>
+</section>
+</main>
+${FOOTER}
 </body>
 </html>`);
 });

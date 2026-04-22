@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { config } from '../config';
 import { createSubscription, getSubscription as getPayPalSub } from '../paypal';
 import { getSubscription, upsertSubscription } from '../db';
+import { TAILWIND_SETUP, topNav, FOOTER } from '../ui';
 
 const router = Router();
 
@@ -24,20 +25,8 @@ function tierFromPlan(plan: Plan): string {
   return plan.toUpperCase();
 }
 
-const FEATURES: Record<string, string[]> = {
-  free: ['100 enrollments / month', 'All workflow types (contact, deal, company)', 'Association label filtering', 'Community support'],
-  pro: ['1,000 enrollments / month', 'All workflow types (contact, deal, company)', 'Association label filtering', 'Email support'],
-  enterprise: ['Unlimited enrollments', 'All workflow types (contact, deal, company)', 'Association label filtering', 'Priority support & onboarding'],
-};
-
 // ── Pricing page ──────────────────────────────────────────────────────────────
 
-/**
- * GET /pricing
- * Public pricing page — also the landing page after a fresh install.
- * Pass ?portalId=X to pre-fill the subscribe buttons.
- * Pass ?installed=1 to show a "you just installed" banner.
- */
 router.get('/', async (req: Request, res: Response) => {
   const portalId = String(req.query.portalId ?? '');
   const justInstalled = req.query.installed === '1';
@@ -49,144 +38,143 @@ router.get('/', async (req: Request, res: Response) => {
 
   const savePct = Math.round((1 - (pro.yearly / 12) / pro.monthly) * 100);
 
-  const card = (
-    id: string,
-    name: string,
-    monthlyPrice: number | null,
-    yearlyPrice: number | null,
-    features: string[],
-    highlight: boolean,
-    plan: Plan | null
-  ) => {
-    const isCurrent = currentTier === id.toUpperCase();
+  const features = {
+    free: ['100 enrollments / month', 'All workflow types (contact, deal, company)', 'Association label filtering', 'Community support'],
+    pro: ['1,000 enrollments / month', 'All workflow types (contact, deal, company)', 'Association label filtering', 'Email support'],
+    enterprise: ['Unlimited enrollments', 'All workflow types (contact, deal, company)', 'Association label filtering', 'Priority support &amp; onboarding'],
+  };
+
+  const featureList = (items: string[]) =>
+    items.map((f) => `
+    <li class="flex items-center gap-3">
+      <span class="material-symbols-outlined text-primary-container text-[20px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+      <span class="font-body-base text-body-base text-on-surface">${f}</span>
+    </li>`).join('');
+
+  const isCurrent = (tier: string) => currentTier === tier.toUpperCase();
+
+  const subscribeBtn = (plan: Plan, highlight: boolean) => {
+    if (isCurrent(plan)) {
+      return `<button class="w-full bg-surface-container border border-outline-variant text-secondary px-4 py-3 rounded-[7px] font-button-text text-button-text mt-auto cursor-default" disabled>Current Plan</button>`;
+    }
+    const btnClass = highlight
+      ? 'w-full bg-primary-container text-white px-4 py-3 rounded-[7px] font-button-text text-button-text hover:opacity-90 transition-all duration-100 active:scale-95 mt-auto shadow-sm'
+      : 'w-full bg-white border border-outline-variant text-on-surface px-4 py-3 rounded-[7px] font-button-text text-button-text hover:bg-[#f9fafb] transition-all duration-100 active:scale-95 mt-auto';
     return `
-    <div class="card${highlight ? ' highlight' : ''}${isCurrent ? ' current' : ''}">
-      ${highlight ? '<div class="badge">Most Popular</div>' : ''}
-      ${isCurrent ? '<div class="badge badge-current">Your Plan</div>' : ''}
-      <h3>${name}</h3>
-      <div class="price monthly-price">
-        ${monthlyPrice === null ? '<span class="amount">$0</span><span class="period">/mo</span>' : `<span class="amount">$${monthlyPrice}</span><span class="period">/mo</span>`}
-      </div>
-      <div class="price yearly-price" style="display:none">
-        ${yearlyPrice === null ? '<span class="amount">$0</span><span class="period">/mo</span><span class="billed">billed annually</span>' : `<span class="amount">$${Math.round(yearlyPrice / 12)}</span><span class="period">/mo</span><span class="billed">$${yearlyPrice} billed annually</span>`}
-      </div>
-      <ul>
-        ${features.map((f) => `<li>${f}</li>`).join('')}
-      </ul>
-      ${
-        plan === null
-          ? `<a href="/auth/install" class="btn btn-outline">Get Started Free</a>`
-          : isCurrent
-          ? `<button class="btn btn-disabled" disabled>Current Plan</button>`
-          : `
-          <form action="/pricing/subscribe" method="POST">
-            <input type="hidden" name="plan" value="${plan}">
-            <input type="hidden" name="cycle" value="monthly" class="cycle-input">
-            <input type="hidden" name="portalId" value="${portalId}" class="portal-input">
-            <button type="submit" class="btn${highlight ? '' : ' btn-outline'}"
-              ${!portalId ? 'onclick="return checkInstall()"' : ''}>
-              Subscribe
-            </button>
-          </form>`
-      }
-    </div>`;
+    <form action="/pricing/subscribe" method="POST" class="mt-auto">
+      <input type="hidden" name="plan" value="${plan}">
+      <input type="hidden" name="cycle" value="monthly" class="cycle-input">
+      <input type="hidden" name="portalId" value="${portalId}" class="portal-input">
+      <button type="submit" class="${btnClass}"${!portalId ? ' onclick="return checkInstall()"' : ''}>Subscribe</button>
+    </form>`;
   };
 
   res.send(`<!doctype html>
-<html lang="en">
+<html class="light" lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Pricing — Flow Enroll</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f7f8fa;color:#1a202c}
-    nav{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between}
-    nav a{color:#1a202c;text-decoration:none;font-weight:600;font-size:.95rem}
-    nav .links a{margin-left:24px;font-weight:400;color:#4a5568}
-    .banner{background:#ebf8ff;border-bottom:1px solid #bee3f8;padding:12px 24px;text-align:center;font-size:.9rem;color:#2c5282}
-    .wrap{max-width:1000px;margin:0 auto;padding:56px 24px}
-    h1{font-size:2rem;font-weight:700;text-align:center;margin-bottom:8px}
-    .sub{text-align:center;color:#718096;margin-bottom:40px;font-size:1.05rem}
-    .toggle-wrap{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:48px}
-    .toggle-label{font-size:.9rem;color:#4a5568;font-weight:500}
-    .toggle{position:relative;width:52px;height:28px;cursor:pointer}
-    .toggle input{opacity:0;width:0;height:0}
-    .slider{position:absolute;inset:0;background:#cbd5e0;border-radius:28px;transition:.2s}
-    .slider::before{content:'';position:absolute;width:22px;height:22px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s}
-    input:checked+.slider{background:#ff7a59}
-    input:checked+.slider::before{transform:translateX(24px)}
-    .save-badge{background:#c6f6d5;color:#276749;font-size:.75rem;font-weight:600;padding:2px 8px;border-radius:20px}
-    .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
-    .card{background:#fff;border-radius:12px;padding:28px 24px;border:2px solid #e2e8f0;position:relative;display:flex;flex-direction:column;gap:20px}
-    .card.highlight{border-color:#ff7a59;box-shadow:0 4px 20px rgba(255,122,89,.15)}
-    .card.current{border-color:#48bb78}
-    .badge{position:absolute;top:-14px;left:50%;transform:translateX(-50%);background:#ff7a59;color:#fff;font-size:.72rem;font-weight:700;padding:4px 14px;border-radius:20px;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em}
-    .badge-current{background:#48bb78}
-    h3{font-size:1.1rem;font-weight:700;color:#2d3748}
-    .amount{font-size:2.4rem;font-weight:800;color:#1a202c}
-    .period{color:#718096;font-size:1rem;margin-left:2px}
-    .billed{display:block;font-size:.78rem;color:#a0aec0;margin-top:2px}
-    ul{list-style:none;display:flex;flex-direction:column;gap:10px;flex:1}
-    li{font-size:.88rem;color:#4a5568;display:flex;gap:8px;align-items:flex-start}
-    li::before{content:'✓';color:#48bb78;font-weight:700;flex-shrink:0}
-    .btn{display:block;text-align:center;padding:12px;border-radius:7px;font-weight:600;font-size:.95rem;cursor:pointer;border:none;background:#ff7a59;color:#fff;text-decoration:none;width:100%}
-    .btn:hover{background:#f56444}
-    .btn-outline{background:#fff;color:#ff7a59;border:2px solid #ff7a59}
-    .btn-outline:hover{background:#fff5f0}
-    .btn-disabled{background:#e2e8f0;color:#a0aec0;cursor:default}
-    @media(max-width:700px){.cards{grid-template-columns:1fr}}
-  </style>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Flow Enroll - Pricing</title>
+${TAILWIND_SETUP}
 </head>
-<body>
-<nav>
-  <a href="/">Flow Enroll</a>
-  <div class="links">
-    ${portalId
-      ? `<a href="https://app.hubspot.com">Back to HubSpot</a>`
-      : `<a href="/auth/install">Install</a>`}
+<body class="font-body-base text-body-base text-on-surface antialiased min-h-screen flex flex-col bg-background">
+${topNav('pricing')}
+${justInstalled ? `<div class="bg-[#ebf8ff] border-b border-[#bee3f8] px-8 py-3 text-center font-body-sm text-body-sm text-[#2c5282]">
+  App installed on portal <strong>${portalId}</strong>. Choose a plan or continue on the Free tier.
+</div>` : ''}
+<main class="flex-grow flex flex-col items-center justify-center px-8 py-16 w-full max-w-[1280px] mx-auto">
+  <div class="text-center mb-12">
+    <h1 class="font-h1 text-h1 text-on-surface mb-4">Simple, transparent pricing</h1>
+    <p class="font-body-base text-body-base text-secondary mb-8 max-w-2xl mx-auto">Choose the plan that fits your enrollment needs. No hidden fees.</p>
+    <div class="inline-flex items-center bg-surface-container-low rounded-full p-1 border border-outline-variant">
+      <button id="btn-monthly" class="px-6 py-2 rounded-full bg-white shadow-sm font-button-text text-button-text text-on-surface transition-all duration-200" type="button">Monthly</button>
+      <div class="flex items-center">
+        <button id="btn-yearly" class="px-6 py-2 rounded-full font-button-text text-button-text text-secondary hover:text-on-surface transition-colors duration-200" type="button">Yearly</button>
+        <span class="ml-2 mr-4 px-2 py-1 bg-primary-container text-white rounded-full font-label-caps text-label-caps">Save ${savePct}%</span>
+      </div>
+    </div>
   </div>
-</nav>
-${justInstalled ? `<div class="banner">App installed successfully on portal <strong>${portalId}</strong>. Choose a plan below to get started, or continue on the Free tier.</div>` : ''}
-<div class="wrap">
-  <h1>Simple, transparent pricing</h1>
-  <p class="sub">Start free, upgrade as you grow. No contracts. Cancel anytime.</p>
-
-  <div class="toggle-wrap">
-    <span class="toggle-label">Monthly</span>
-    <label class="toggle">
-      <input type="checkbox" id="cycle-toggle">
-      <span class="slider"></span>
-    </label>
-    <span class="toggle-label">Yearly <span class="save-badge">Save ${savePct}%</span></span>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-5xl">
+    <!-- Free Plan -->
+    <div class="bg-white rounded-xl p-card-padding border ${isCurrent('free') ? 'border-2 border-tertiary' : 'border-outline-variant'} shadow-[0_1px_4px_rgba(0,0,0,0.08)] flex flex-col">
+      ${isCurrent('free') ? '<div class="text-center mb-2"><span class="bg-tertiary text-white px-3 py-1 rounded-full font-label-caps text-label-caps">Your Plan</span></div>' : ''}
+      <div class="mb-6 border-b border-outline-variant pb-6">
+        <h3 class="font-h3 text-h3 text-on-surface mb-2">Free</h3>
+        <div class="flex items-baseline gap-1 mb-1">
+          <span class="font-h1 text-h1 text-on-surface monthly-price">$0</span>
+          <span class="font-body-sm text-body-sm text-secondary monthly-price">/mo</span>
+          <span class="font-h1 text-h1 text-on-surface yearly-price hidden">$0</span>
+          <span class="font-body-sm text-body-sm text-secondary yearly-price hidden">/mo</span>
+        </div>
+        <p class="font-body-sm text-body-sm text-secondary">Perfect for getting started with basic enrollments.</p>
+      </div>
+      <ul class="flex-grow space-y-4 mb-8">${featureList(features.free)}</ul>
+      <a href="/auth/install" class="w-full inline-flex justify-center items-center bg-white border border-outline-variant text-on-surface px-4 py-3 rounded-[7px] font-button-text text-button-text hover:bg-[#f9fafb] transition-all duration-100 active:scale-95 mt-auto">Get Started Free</a>
+    </div>
+    <!-- Pro Plan -->
+    <div class="bg-white rounded-xl p-card-padding border-2 border-primary-container shadow-[0_4px_12px_rgba(0,0,0,0.12)] flex flex-col relative md:-translate-y-4">
+      <div class="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+        <span class="bg-primary-container text-white px-3 py-1 rounded-full font-label-caps text-label-caps">${isCurrent('pro') ? 'Your Plan' : 'Most Popular'}</span>
+      </div>
+      <div class="mb-6 border-b border-outline-variant pb-6">
+        <h3 class="font-h3 text-h3 text-on-surface mb-2">Pro</h3>
+        <div class="flex items-baseline gap-1 mb-1">
+          <span class="font-h1 text-h1 text-on-surface monthly-price">$${pro.monthly}</span>
+          <span class="font-body-sm text-body-sm text-secondary monthly-price">/mo</span>
+          <span class="font-h1 text-h1 text-on-surface yearly-price hidden">$${Math.round(pro.yearly / 12)}</span>
+          <span class="font-body-sm text-body-sm text-secondary yearly-price hidden">/mo</span>
+        </div>
+        <p class="font-body-sm text-body-sm text-secondary yearly-note hidden">$${pro.yearly} billed annually</p>
+        <p class="font-body-sm text-body-sm text-secondary">For growing businesses needing more capacity.</p>
+      </div>
+      <ul class="flex-grow space-y-4 mb-8">${featureList(features.pro)}</ul>
+      ${subscribeBtn('pro', true)}
+    </div>
+    <!-- Enterprise Plan -->
+    <div class="bg-white rounded-xl p-card-padding border ${isCurrent('enterprise') ? 'border-2 border-tertiary' : 'border-outline-variant'} shadow-[0_1px_4px_rgba(0,0,0,0.08)] flex flex-col">
+      ${isCurrent('enterprise') ? '<div class="text-center mb-2"><span class="bg-tertiary text-white px-3 py-1 rounded-full font-label-caps text-label-caps">Your Plan</span></div>' : ''}
+      <div class="mb-6 border-b border-outline-variant pb-6">
+        <h3 class="font-h3 text-h3 text-on-surface mb-2">Enterprise</h3>
+        <div class="flex items-baseline gap-1 mb-1">
+          <span class="font-h1 text-h1 text-on-surface monthly-price">$${enterprise.monthly}</span>
+          <span class="font-body-sm text-body-sm text-secondary monthly-price">/mo</span>
+          <span class="font-h1 text-h1 text-on-surface yearly-price hidden">$${Math.round(enterprise.yearly / 12)}</span>
+          <span class="font-body-sm text-body-sm text-secondary yearly-price hidden">/mo</span>
+        </div>
+        <p class="font-body-sm text-body-sm text-secondary yearly-note hidden">$${enterprise.yearly} billed annually</p>
+        <p class="font-body-sm text-body-sm text-secondary">Unlimited power for large scale operations.</p>
+      </div>
+      <ul class="flex-grow space-y-4 mb-8">${featureList(features.enterprise)}</ul>
+      ${subscribeBtn('enterprise', false)}
+    </div>
   </div>
-
-  <div class="cards">
-    ${card('free', 'Free', 0, 0, FEATURES.free, false, null)}
-    ${card('pro', 'Pro', pro.monthly, pro.yearly, FEATURES.pro, true, 'pro')}
-    ${card('enterprise', 'Enterprise', enterprise.monthly, enterprise.yearly, FEATURES.enterprise, false, 'enterprise')}
-  </div>
-</div>
-
+</main>
+${FOOTER}
 <script>
-  const toggle = document.getElementById('cycle-toggle');
-  const monthlyPrices = document.querySelectorAll('.monthly-price');
-  const yearlyPrices  = document.querySelectorAll('.yearly-price');
-  const cycleInputs   = document.querySelectorAll('.cycle-input');
+  const btnMonthly = document.getElementById('btn-monthly');
+  const btnYearly  = document.getElementById('btn-yearly');
 
-  toggle.addEventListener('change', () => {
-    const yearly = toggle.checked;
-    monthlyPrices.forEach(el => el.style.display = yearly ? 'none' : '');
-    yearlyPrices.forEach(el  => el.style.display = yearly ? '' : 'none');
-    cycleInputs.forEach(el   => el.value = yearly ? 'yearly' : 'monthly');
-  });
+  function setYearly(yearly) {
+    document.querySelectorAll('.monthly-price').forEach(el => el.classList.toggle('hidden', yearly));
+    document.querySelectorAll('.yearly-price').forEach(el  => el.classList.toggle('hidden', !yearly));
+    document.querySelectorAll('.yearly-note').forEach(el   => el.classList.toggle('hidden', !yearly));
+    document.querySelectorAll('.cycle-input').forEach(el   => el.value = yearly ? 'yearly' : 'monthly');
+    btnMonthly.className = yearly
+      ? 'px-6 py-2 rounded-full font-button-text text-button-text text-secondary hover:text-on-surface transition-colors duration-200'
+      : 'px-6 py-2 rounded-full bg-white shadow-sm font-button-text text-button-text text-on-surface transition-all duration-200';
+    btnYearly.className = yearly
+      ? 'px-6 py-2 rounded-full bg-white shadow-sm font-button-text text-button-text text-on-surface transition-all duration-200'
+      : 'px-6 py-2 rounded-full font-button-text text-button-text text-secondary hover:text-on-surface transition-colors duration-200';
+  }
 
-  // Pre-fill portalId from URL (supports sharing the pricing page directly)
+  btnMonthly.addEventListener('click', () => setYearly(false));
+  btnYearly.addEventListener('click',  () => setYearly(true));
+
   const pid = new URLSearchParams(location.search).get('portalId') || '';
   document.querySelectorAll('.portal-input').forEach(el => el.value = pid);
 
   function checkInstall() {
-    alert('Please install the app on your HubSpot portal first by clicking "Install" at the top.');
+    alert('Please install the app on your HubSpot portal first.');
     return false;
   }
 </script>
@@ -196,10 +184,6 @@ ${justInstalled ? `<div class="banner">App installed successfully on portal <str
 
 // ── Subscribe → create PayPal subscription ────────────────────────────────────
 
-/**
- * POST /pricing/subscribe
- * Creates a PayPal subscription and redirects to PayPal for approval.
- */
 router.post('/subscribe', async (req: Request, res: Response) => {
   const plan = req.body.plan as Plan;
   const cycle = req.body.cycle as Cycle;
@@ -233,11 +217,6 @@ router.post('/subscribe', async (req: Request, res: Response) => {
 
 // ── Return URL after PayPal approval ─────────────────────────────────────────
 
-/**
- * GET /pricing/return
- * PayPal redirects here after the user approves the subscription.
- * We optimistically activate the tier immediately and show a success page.
- */
 router.get('/return', async (req: Request, res: Response) => {
   const subscriptionId = req.query.subscription_id as string | undefined;
 
@@ -270,20 +249,28 @@ router.get('/return', async (req: Request, res: Response) => {
     res.send(`<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"><title>Subscribed — Flow Enroll</title>
-  <style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f7f8fa}
-  .box{background:#fff;border-radius:12px;padding:48px 40px;max-width:480px;text-align:center;box-shadow:0 2px 16px rgba(0,0,0,.08)}
-  h2{font-size:1.6rem;margin-bottom:12px;color:#1a202c} p{color:#718096;line-height:1.6;margin-bottom:24px}
-  a{display:inline-block;background:#ff7a59;color:#fff;padding:12px 28px;border-radius:7px;text-decoration:none;font-weight:600}</style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Subscribed — Flow Enroll</title>
+${TAILWIND_SETUP}
 </head>
-<body>
-  <div class="box">
-    <div style="font-size:2.5rem;margin-bottom:16px">🎉</div>
-    <h2>You're all set!</h2>
-    <p>Portal <strong>${portalId}</strong> has been upgraded to the <strong>${plan.charAt(0).toUpperCase() + plan.slice(1)}</strong> plan (${cycle}).</p>
-    <a href="https://app.hubspot.com">Back to HubSpot</a>
+<body class="bg-background min-h-screen flex items-center justify-center p-6 antialiased">
+<div class="w-full max-w-[420px] bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant p-[24px] flex flex-col items-center text-center">
+  <div class="mb-6 flex items-center justify-center w-16 h-16 rounded-full bg-tertiary-container/20">
+    <span class="material-symbols-outlined text-[32px] text-tertiary" style="font-variation-settings: 'FILL' 1;">celebration</span>
   </div>
-</body></html>`);
+  <h1 class="font-h2 text-h2 text-on-surface mb-3">You're all set!</h1>
+  <p class="font-body-base text-body-base text-on-surface-variant mb-8">
+    Portal <span class="font-medium text-on-surface">${portalId}</span> has been upgraded to the
+    <span class="font-medium text-on-surface">${plan.charAt(0).toUpperCase() + plan.slice(1)}</span> plan (${cycle}).
+  </p>
+  <a href="https://app.hubspot.com" class="w-full inline-flex justify-center items-center gap-2 px-4 py-3 bg-primary text-on-primary font-button-text text-button-text rounded-lg transition-all duration-200 shadow-sm">
+    Back to HubSpot
+    <span class="material-symbols-outlined text-[18px]">open_in_new</span>
+  </a>
+</div>
+</body>
+</html>`);
   } catch (err: any) {
     console.error('[pricing/return]', err?.response?.data ?? err.message);
     res.redirect('/pricing?error=activation_failed');
@@ -292,11 +279,6 @@ router.get('/return', async (req: Request, res: Response) => {
 
 // ── PayPal webhook for subscription lifecycle events ──────────────────────────
 
-/**
- * POST /paypal/webhook
- * Handles subscription activated / cancelled / suspended / expired events.
- * Mounted at the root level in index.ts (not under /pricing).
- */
 export async function handlePayPalWebhook(req: Request, res: Response): Promise<void> {
   const { verifyWebhook } = await import('../paypal');
   const rawBody: Buffer = (req as any).rawBody ?? Buffer.alloc(0);
@@ -316,7 +298,7 @@ export async function handlePayPalWebhook(req: Request, res: Response): Promise<
   const portalId = parseInt(portalIdStr ?? '', 10);
 
   if (!portalId || !plan) {
-    res.sendStatus(200); // Not one of ours (or bad custom_id)
+    res.sendStatus(200);
     return;
   }
 
