@@ -13,7 +13,7 @@ function intOr(value: string | undefined, fallback: number): number {
 
 export const config = {
   port: intOr(process.env.PORT, 3000),
-  baseUrl: env('BASE_URL'),
+  baseUrl: process.env.BASE_URL ?? process.env.RENDER_EXTERNAL_URL ?? 'http://localhost:3000',
 
   hubspot: {
     clientId: env('HUBSPOT_CLIENT_ID'),
