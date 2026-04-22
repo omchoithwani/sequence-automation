@@ -33,7 +33,15 @@ app.get('/', (_req, res) => {
 ${TAILWIND_SETUP}
 </head>
 <body class="bg-background text-on-background font-body-base antialiased min-h-screen flex flex-col">
-${topNav('landing')}
+<header class="bg-[#1a202c] sticky top-0 z-50 w-full border-b border-slate-800 shadow-sm font-['Inter'] text-sm font-medium tracking-tight">
+<div class="flex justify-between items-center w-full px-8 h-16 max-w-[1280px] mx-auto">
+  <a class="text-xl font-black text-white hover:opacity-100 transition-all duration-200" href="/">Flow Enroll</a>
+  <div class="flex items-center gap-6">
+    <a class="text-white opacity-70 hover:opacity-100 hover:text-white transition-all duration-200" href="/pricing">Pricing</a>
+    <a class="text-white opacity-70 hover:opacity-100 hover:text-white transition-all duration-200" href="mailto:support@flowenroll.io">Support</a>
+  </div>
+</div>
+</header>
 <main class="flex-grow w-full max-w-[1280px] mx-auto px-8 py-20 flex flex-col gap-32">
 <!-- Hero Section -->
 <section class="flex flex-col items-center text-center max-w-3xl mx-auto gap-8 pt-12">
@@ -57,7 +65,7 @@ ${topNav('landing')}
   </div>
   <div class="mt-8 text-secondary font-body-sm text-body-sm flex items-center gap-2 opacity-80">
     <span class="material-symbols-outlined text-[16px] text-[#00a4bd]">check_circle</span>
-    Works with Sales Hub Professional &amp; Enterprise
+    For Sales Hub Professional — Enterprise already includes this natively
   </div>
 </section>
 <!-- Feature Grid -->
