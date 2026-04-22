@@ -29,7 +29,7 @@ app.get('/', (_req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>HubSpot Sequence Automation</title>
+  <title>Flow Enroll</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f7f8fa;color:#1a202c;line-height:1.6}
@@ -52,7 +52,7 @@ app.get('/', (_req, res) => {
 </head>
 <body>
   <div class="wrap">
-    <h1>HubSpot Sequence Automation</h1>
+    <h1>Flow Enroll</h1>
     <p class="sub">Custom workflow actions that unlock sequence enrollment, unenrollment, and A/B branching — without needing Enterprise.</p>
     <div class="grid">
       <div class="card">

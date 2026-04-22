@@ -1,7 +1,7 @@
 {
-  "name": "sequence-automation",
+  "name": "flow-enroll",
   "version": "1.0.0",
-  "description": "HubSpot public app: enroll contacts in sequences and random-branch via workflow actions",
+  "description": "Flow Enroll — HubSpot workflow actions for sequence enrollment, unenrollment, and random branching",
   "main": "dist/index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",

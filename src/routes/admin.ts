@@ -85,7 +85,7 @@ router.get('/', async (req: Request, res: Response) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Admin — HubSpot Sequence Automation</title>
+  <title>Admin — Flow Enroll</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f7f8fa;color:#1a202c}
@@ -112,7 +112,7 @@ router.get('/', async (req: Request, res: Response) => {
 <body>
 <header>
   <h1>Super Admin</h1>
-  <span>HubSpot Sequence Automation</span>
+  <span>Flow Enroll</span>
 </header>
 <div class="wrap">
   <div class="cards">

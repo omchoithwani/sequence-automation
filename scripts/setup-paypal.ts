@@ -1,7 +1,7 @@
 /**
  * setup-paypal.ts
  *
- * One-time setup: creates the HubSpot Sequence Automation product and
+ * One-time setup: creates the Flow Enroll product and
  * four billing plans (Pro Monthly, Pro Yearly, Enterprise Monthly, Enterprise Yearly)
  * in your PayPal account.
  *
@@ -33,7 +33,7 @@ async function main() {
   console.log(`\nCreating PayPal plans (env: ${env})\n`);
 
   console.log('Creating product…');
-  const productId = await createProduct('HubSpot Sequence Automation');
+  const productId = await createProduct('Flow Enroll');
   console.log(`  Product ID: ${productId}\n`);
 
   const plans = [

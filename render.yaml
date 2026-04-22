@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: sequence-automation
+    name: flow-enroll
     env: node
     plan: free
     buildCommand: npm ci --include=dev && npm run build

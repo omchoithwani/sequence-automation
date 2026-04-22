@@ -97,7 +97,7 @@ router.get('/', async (req: Request, res: Response) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Pricing — HubSpot Sequence Automation</title>
+  <title>Pricing — Flow Enroll</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f7f8fa;color:#1a202c}
@@ -140,7 +140,7 @@ router.get('/', async (req: Request, res: Response) => {
 </head>
 <body>
 <nav>
-  <a href="/">HubSpot Sequence Automation</a>
+  <a href="/">Flow Enroll</a>
   <div class="links">
     ${portalId
       ? `<a href="https://app.hubspot.com">Back to HubSpot</a>`
@@ -270,7 +270,7 @@ router.get('/return', async (req: Request, res: Response) => {
     res.send(`<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"><title>Subscribed — HubSpot Sequence Automation</title>
+  <meta charset="UTF-8"><title>Subscribed — Flow Enroll</title>
   <style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f7f8fa}
   .box{background:#fff;border-radius:12px;padding:48px 40px;max-width:480px;text-align:center;box-shadow:0 2px 16px rgba(0,0,0,.08)}
   h2{font-size:1.6rem;margin-bottom:12px;color:#1a202c} p{color:#718096;line-height:1.6;margin-bottom:24px}
