@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { config } from '../config';
 import { createSubscription, getSubscription as getPayPalSub } from '../paypal';
 import { getSubscription, upsertSubscription } from '../db';
-import { TAILWIND_SETUP, topNav, FOOTER } from '../ui';
+import { TAILWIND_SETUP, FOOTER } from '../ui';
 
 const router = Router();
 
@@ -78,7 +78,15 @@ router.get('/', async (req: Request, res: Response) => {
 ${TAILWIND_SETUP}
 </head>
 <body class="font-body-base text-body-base text-on-surface antialiased min-h-screen flex flex-col bg-background">
-${topNav('pricing')}
+<header class="bg-[#1a202c] sticky top-0 z-50 w-full border-b border-slate-800 shadow-sm font-['Inter'] text-sm font-medium tracking-tight">
+<div class="flex justify-between items-center w-full px-8 h-16 max-w-[1280px] mx-auto">
+  <a class="text-xl font-black text-white hover:opacity-100 transition-all duration-200" href="/">Flow Enroll</a>
+  <div class="flex items-center gap-6">
+    <a class="text-white opacity-100 border-b-2 border-[#ff7a59] pb-1" href="/pricing">Pricing</a>
+    <a class="text-white opacity-70 hover:opacity-100 hover:text-white transition-all duration-200" href="mailto:support@flowenroll.io">Support</a>
+  </div>
+</div>
+</header>
 ${justInstalled ? `<div class="bg-[#ebf8ff] border-b border-[#bee3f8] px-8 py-3 text-center font-body-sm text-body-sm text-[#2c5282]">
   App installed on portal <strong>${portalId}</strong>. Choose a plan or continue on the Free tier.
 </div>` : ''}
