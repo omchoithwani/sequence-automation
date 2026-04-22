@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getSequenceCounts } from '../db';
 import { getSequenceStatsMap } from '../hubspot';
-import { TAILWIND_SETUP, FOOTER } from '../ui';
+import { TAILWIND_SETUP, WORDMARK_DARK, FOOTER } from '../ui';
 
 const router = Router();
 
@@ -107,7 +107,7 @@ ${TAILWIND_SETUP}
 <header class="bg-[#1a202c] sticky top-0 z-50 shadow-sm border-b border-slate-800">
   <div class="flex justify-between items-center w-full px-8 h-16 max-w-[1280px] mx-auto">
     <div class="flex items-center gap-8">
-      <a href="/" class="text-xl font-black text-white">Flow Enroll</a>
+      ${WORDMARK_DARK}
       <nav class="hidden md:flex gap-6 font-['Inter'] text-sm font-medium tracking-tight">
         <a class="text-white opacity-100 border-b-2 border-[#ff7a59] pb-1 hover:text-white transition-all duration-200" href="/dashboard?portalId=${portalId}">Dashboard</a>
       </nav>

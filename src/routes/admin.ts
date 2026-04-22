@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getAllPortals, upsertSubscription, TIER_LIMITS } from '../db';
 import { adminAuth } from '../middleware/admin-auth';
-import { TAILWIND_SETUP, FOOTER } from '../ui';
+import { TAILWIND_SETUP, WORDMARK_DARK, FOOTER } from '../ui';
 
 const router = Router();
 router.use(adminAuth);
@@ -90,13 +90,13 @@ ${TAILWIND_SETUP}
 <header class="bg-[#1a202c] sticky top-0 z-50 shadow-sm border-b border-slate-800">
   <div class="flex justify-between items-center w-full px-8 h-16 max-w-[1280px] mx-auto">
     <div class="flex items-center gap-4">
-      <span class="text-xl font-black text-white">Super Admin</span>
+      ${WORDMARK_DARK}
     </div>
     <nav class="hidden md:flex items-center gap-6 font-['Inter'] text-sm font-medium tracking-tight">
       <a class="text-white opacity-100 border-b-2 border-[#ff7a59] pb-1 hover:text-white transition-all duration-200" href="/admin?secret=${encodeURIComponent(secret)}">Dashboard</a>
     </nav>
     <div class="flex items-center gap-4">
-      <span class="text-sm font-medium text-[#ff7a59]">Flow Enroll</span>
+      <span class="text-sm font-medium text-[#ff7a59]">Super Admin</span>
     </div>
   </div>
 </header>

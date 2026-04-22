@@ -8,7 +8,7 @@ import pricingRoutes, { handlePayPalWebhook } from './routes/pricing';
 import adminRoutes from './routes/admin';
 import dashboardRoutes from './routes/dashboard';
 import { validateHubSpotSignature } from './middleware/signature';
-import { TAILWIND_SETUP, topNav, FOOTER } from './ui';
+import { TAILWIND_SETUP, WORDMARK_DARK, FOOTER } from './ui';
 
 const app = express();
 
@@ -35,7 +35,7 @@ ${TAILWIND_SETUP}
 <body class="bg-background text-on-background font-body-base antialiased min-h-screen flex flex-col">
 <header class="bg-[#1a202c] sticky top-0 z-50 w-full border-b border-slate-800 shadow-sm font-['Inter'] text-sm font-medium tracking-tight">
 <div class="flex justify-between items-center w-full px-8 h-16 max-w-[1280px] mx-auto">
-  <a class="text-xl font-black text-white hover:opacity-100 transition-all duration-200" href="/">Flow Enroll</a>
+  ${WORDMARK_DARK}
   <div class="flex items-center gap-6">
     <a class="text-white opacity-70 hover:opacity-100 hover:text-white transition-all duration-200" href="/pricing">Pricing</a>
     <a class="text-white opacity-70 hover:opacity-100 hover:text-white transition-all duration-200" href="mailto:support@flowenroll.io">Support</a>

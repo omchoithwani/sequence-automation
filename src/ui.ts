@@ -1,6 +1,15 @@
 // Shared HTML fragments — Tailwind CDN config, top nav, and footer
 
-export const TAILWIND_SETUP = `<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+// Lightning bolt SVG — matches the Flow Enroll logo icon
+export const BOLT_SVG = `<svg width="14" height="20" viewBox="0 0 14 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M9.5 0L0 12H6L4 20L14 8H8L9.5 0Z" fill="#ff7a59"/>
+</svg>`;
+
+// Favicon data URI — dark rounded square with bolt
+const FAVICON = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%231a202c'/><path d='M19 4L7 18h8l-3 10L25 14h-8z' fill='%23ff7a59'/></svg>`;
+
+export const TAILWIND_SETUP = `<link rel="icon" href="${FAVICON}"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script>
@@ -84,16 +93,26 @@ tailwind.config = {
 }
 </script>`;
 
-export function topNav(activePage?: 'landing' | 'pricing' | 'dashboard'): string {
+// Wordmark for dark nav backgrounds (white text)
+export const WORDMARK_DARK = `<a href="/" class="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
+  ${BOLT_SVG}
+  <span class="text-xl font-black text-white tracking-tight">Flow Enroll</span>
+</a>`;
+
+// Wordmark for light backgrounds (dark text)
+export const WORDMARK_LIGHT = `<a href="/" class="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
+  ${BOLT_SVG}
+  <span class="text-xl font-black text-[#1a202c] tracking-tight">Flow Enroll</span>
+</a>`;
+
+export function topNav(activePage?: 'dashboard'): string {
   const link = (label: string, href: string, active: boolean) =>
     `<a class="text-white ${active ? 'opacity-100 border-b-2 border-[#ff7a59] pb-1' : 'opacity-70 hover:opacity-100'} hover:text-white transition-all duration-200" href="${href}">${label}</a>`;
   return `<header class="bg-[#1a202c] sticky top-0 z-50 w-full border-b border-slate-800 shadow-sm font-['Inter'] text-sm font-medium tracking-tight">
 <div class="flex justify-between items-center w-full px-8 h-16 max-w-[1280px] mx-auto">
   <div class="flex items-center gap-8">
-    <a class="text-xl font-black text-white hover:opacity-100 transition-all duration-200" href="/">Flow Enroll</a>
+    ${WORDMARK_DARK}
     <nav class="hidden md:flex items-center gap-6">
-      ${link('Landing', '/', activePage === 'landing')}
-      ${link('Pricing', '/pricing', activePage === 'pricing')}
       ${link('Dashboard', '/dashboard', activePage === 'dashboard')}
     </nav>
   </div>
@@ -106,8 +125,8 @@ export function topNav(activePage?: 'landing' | 'pricing' | 'dashboard'): string
 
 export const FOOTER = `<footer class="bg-white border-t border-slate-200 mt-auto">
 <div class="flex flex-col md:flex-row justify-between items-center px-8 py-10 w-full max-w-[1280px] mx-auto gap-4 font-['Inter'] text-xs text-slate-500">
-  <div class="flex items-center gap-2">
-    <span class="text-sm font-bold text-slate-900">Flow Enroll</span>
+  <div class="flex items-center gap-3">
+    ${WORDMARK_LIGHT}
     <span>© 2026 Flow Enroll. All rights reserved.</span>
   </div>
   <nav class="flex flex-wrap items-center gap-6">
